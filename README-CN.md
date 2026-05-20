@@ -1,4 +1,4 @@
-# Raindrop
+# Rain Effect
 
 [English](./README.md) | 简体中文
 
