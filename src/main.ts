@@ -37,11 +37,13 @@ let targetParallaxX = 0;
 let targetParallaxY = 0;
 let resizeQueued = false;
 
+const assetPath = (path: string) => import.meta.env.BASE_URL + path;
+
 const images = await loadImages([
-  { name: "dropAlpha", src: "/img/drop-alpha.png" },
-  { name: "dropColor", src: "/img/drop-color.png" },
-  { name: "textureFg", src: "/generated/texture-fg.png" },
-  { name: "textureBg", src: "/generated/texture-bg.png" },
+  { name: "dropAlpha", src: assetPath("img/drop-alpha.png") },
+  { name: "dropColor", src: assetPath("img/drop-color.png") },
+  { name: "textureFg", src: assetPath("generated/texture-fg.png") },
+  { name: "textureBg", src: assetPath("generated/texture-bg.png") },
 ]);
 
 await init();

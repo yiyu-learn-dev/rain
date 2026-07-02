@@ -41,5 +41,6 @@ function backgroundTexturePipeline(): Plugin {
 }
 
 export default defineConfig({
+  base: './',
   plugins: [backgroundTexturePipeline()],
 })
