@@ -1,6 +1,14 @@
-# Rain Effect
+<h1 align="center">Rain Effect</h1>
 
-English | [简体中文](./README-CN.md)
+<p align="center">
+  <a href="./README-CN.md">简体中文</a> | English
+</p>
+
+<p align="center">
+  <a href="https://ark.lysastriel.com/demo/rain-effect" target="_blank">
+    <img src="https://img.shields.io/badge/Demo-Live%20Sandbox-blueviolet?style=for-the-badge" alt="Live Demo" />
+  </a>
+</p>
 
 WebGPU implementation of rain-on-glass effect.
 
