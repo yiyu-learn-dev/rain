@@ -1,0 +1,2715 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>rain 雨窗哈气模拟器</title>
+  <style>
+    :root {
+      --bg: #040811;
+      --panel: rgba(8, 12, 24, 0.78);
+      --panel-strong: rgba(8, 14, 28, 0.94);
+      --line: rgba(255, 255, 255, 0.1);
+      --text: #f5f8ff;
+      --muted: #9cb0d6;
+      --accent: #7fb7ff;
+      --accent-2: #8fe5ff;
+      --danger: #ff8ea7;
+      --stage-radius: 28px;
+      --toolbar-height: 250px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      background:
+        radial-gradient(circle at top, rgba(89, 103, 230, 0.2), transparent 35%),
+        linear-gradient(180deg, #101827 0%, #040811 100%);
+      color: var(--text);
+      font-family: Inter, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      overflow: hidden;
+    }
+
+    body {
+      overscroll-behavior: none;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    button,
+    input,
+    label {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+      color: inherit;
+    }
+
+    .app {
+      position: relative;
+      width: 100%;
+      height: 100dvh;
+      padding:
+        max(12px, env(safe-area-inset-top))
+        max(12px, env(safe-area-inset-right))
+        max(12px, env(safe-area-inset-bottom))
+        max(12px, env(safe-area-inset-left));
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      gap: 12px;
+      overflow: hidden;
+    }
+
+    .app::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 18% 6%, rgba(133, 225, 255, 0.1), transparent 24%),
+        radial-gradient(circle at 82% 12%, rgba(146, 123, 255, 0.12), transparent 28%);
+    }
+
+    .hero {
+      position: relative;
+      z-index: 5;
+      display: flex;
+      gap: 12px;
+      min-width: 0;
+      align-items: flex-start;
+    }
+
+    .card {
+      border-radius: 22px;
+      border: 1px solid var(--line);
+      background: rgba(7, 12, 22, 0.48);
+      backdrop-filter: blur(18px);
+      box-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
+    }
+
+    .hero-main {
+      flex: 1 1 520px;
+      min-width: 0;
+      padding: 14px 16px;
+    }
+
+    .hero-side {
+      flex: 0 0 240px;
+      padding: 12px 14px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 30px;
+      padding: 0 12px;
+      border-radius: 999px;
+      background: rgba(127, 183, 255, 0.14);
+      color: #ddecff;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+    }
+
+    .badge::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent-2), var(--accent));
+      box-shadow: 0 0 12px rgba(143, 229, 255, 0.8);
+    }
+
+    h1 {
+      margin: 10px 0 8px;
+      font-size: clamp(26px, 4.4vw, 40px);
+      line-height: 1.02;
+      letter-spacing: -0.04em;
+    }
+
+    .hero p,
+    .hero-side p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .hero-side strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 13px;
+      color: #ecf4ff;
+    }
+
+    .stage-wrap {
+      position: relative;
+      min-height: 0;
+      z-index: 2;
+    }
+
+    .stage {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      min-height: 320px;
+      overflow: hidden;
+      border-radius: var(--stage-radius);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: linear-gradient(180deg, rgba(181, 194, 255, 0.04), rgba(9, 14, 23, 0.14));
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+        0 28px 70px rgba(0, 0, 0, 0.42);
+      touch-action: none;
+      isolation: isolate;
+    }
+
+    .stage::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 4;
+      pointer-events: none;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.1), transparent 16%, transparent 78%, rgba(255, 255, 255, 0.04)),
+        radial-gradient(circle at 50% -6%, rgba(255, 255, 255, 0.12), transparent 34%);
+    }
+
+    canvas,
+    .rain-fallback {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    #baseCanvas {
+      z-index: 0;
+    }
+
+    #rainCanvas,
+    .rain-fallback {
+      z-index: 1;
+    }
+
+    #fogCanvas {
+      z-index: 2;
+      cursor: cell;
+    }
+
+    .rain-fallback {
+      pointer-events: none;
+      opacity: 0;
+      mix-blend-mode: screen;
+      background-repeat: repeat;
+      background-size: 340px 620px;
+      transition: opacity 180ms ease;
+      animation: fallbackRain 14s linear infinite;
+    }
+
+    .rain-fallback.is-visible {
+      opacity: 0.9;
+    }
+
+    @keyframes fallbackRain {
+      from {
+        background-position: 0 0;
+      }
+      to {
+        background-position: -32px 200px;
+      }
+    }
+
+    .stage-hud {
+      position: absolute;
+      inset: auto 14px 14px 14px;
+      z-index: 5;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    .hud-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      min-height: 38px;
+      padding: 9px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(7, 12, 22, 0.56);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+      color: #edf5ff;
+      font-size: 12px;
+    }
+
+    .hud-pill strong {
+      font-weight: 700;
+    }
+
+    .toolbar {
+      position: relative;
+      z-index: 6;
+      min-height: var(--toolbar-height);
+      padding: 12px;
+      border-radius: 24px;
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(5, 10, 19, 0.9), rgba(5, 10, 19, 0.98));
+      backdrop-filter: blur(22px);
+      box-shadow: 0 18px 42px rgba(0, 0, 0, 0.26);
+      overflow: hidden;
+    }
+
+    .toolbar-grid {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 10px;
+      min-height: 100%;
+    }
+
+    .panel {
+      grid-column: span 12;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 12px;
+      border-radius: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: var(--panel);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    }
+
+    .panel-title {
+      margin: 0;
+      font-size: 13px;
+      letter-spacing: 0.04em;
+      color: #d7e6ff;
+    }
+
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn,
+    .upload-label {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 46px;
+      min-width: 46px;
+      padding: 0 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+      transition: transform 180ms ease, background 180ms ease, border-color 180ms ease;
+    }
+
+    .btn:active,
+    .upload-label:active {
+      transform: scale(0.98);
+    }
+
+    .btn.is-active {
+      border-color: rgba(143, 229, 255, 0.56);
+      background: linear-gradient(135deg, rgba(127, 183, 255, 0.24), rgba(143, 229, 255, 0.2));
+      box-shadow: 0 0 0 1px rgba(143, 229, 255, 0.12) inset;
+    }
+
+    .btn.warn {
+      border-color: rgba(255, 142, 167, 0.24);
+    }
+
+    .slider-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+    }
+
+    .slider-wrap span {
+      min-width: 80px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    input[type="range"] {
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.16);
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: none;
+      background: linear-gradient(135deg, var(--accent-2), var(--accent));
+      box-shadow: 0 6px 14px rgba(84, 145, 255, 0.42);
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    .hint {
+      margin: 0;
+      font-size: 12px;
+      line-height: 1.55;
+      color: var(--muted);
+    }
+
+    .note {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      padding: 0 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.05);
+      color: #d7e3f9;
+      font-size: 12px;
+    }
+
+    .track-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .track-btn {
+      width: 100%;
+      justify-content: flex-start;
+      padding: 10px 14px;
+      text-align: left;
+      line-height: 1.35;
+    }
+
+    .track-btn small {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    @media (min-width: 760px) {
+      .panel.panel-action { grid-column: span 4; }
+      .panel.panel-image { grid-column: span 5; }
+      .panel.panel-audio { grid-column: span 3; }
+      .toolbar { min-height: 198px; }
+    }
+
+    @media (min-width: 1100px) {
+      .app {
+        max-width: 1440px;
+        margin: 0 auto;
+        grid-template-columns: minmax(0, 1fr) 360px;
+        grid-template-rows: auto minmax(0, 1fr);
+      }
+
+      .hero {
+        grid-column: 1 / 2;
+        grid-row: 1 / 2;
+      }
+
+      .stage-wrap {
+        grid-column: 1 / 2;
+        grid-row: 2 / 3;
+      }
+
+      .toolbar {
+        grid-column: 2 / 3;
+        grid-row: 1 / 3;
+        min-height: 0;
+        height: 100%;
+        overflow: auto;
+      }
+
+      .toolbar-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .panel.panel-action,
+      .panel.panel-image,
+      .panel.panel-audio {
+        grid-column: span 1;
+      }
+    }
+
+    @media (max-width: 959px) and (orientation: landscape) {
+      :root {
+        --toolbar-height: 180px;
+      }
+
+      .hero-main,
+      .hero-side {
+        padding: 10px 12px;
+      }
+
+      h1 {
+        font-size: clamp(22px, 3vw, 30px);
+      }
+    }
+
+    @media (max-width: 719px) {
+      .app {
+        gap: 10px;
+      }
+
+      .hero {
+        flex-direction: column;
+      }
+
+      .hero-side {
+        width: 100%;
+      }
+
+      .toolbar {
+        max-height: 42dvh;
+        overflow: auto;
+      }
+
+      .stage-hud {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .rain-fallback,
+      .btn,
+      .upload-label {
+        animation: none !important;
+        transition: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="hero">
+      <div class="card hero-main">
+        <div class="badge">rain 风格 · WebGPU 折射雨滴</div>
+        <h1>雨窗哈气模拟器</h1>
+        <p>这版把 GitHub 仓库的雨滴思路移进了单页：先在隐藏液体画布上实时模拟雨滴，再用 WebGPU 采样前景/背景纹理做折射。上层依然保留“哈气擦雾”交互。</p>
+      </div>
+      <aside class="card hero-side">
+        <strong>交互提示</strong>
+        <p>手指单指拖动或按住鼠标擦雾。移动指针会带一点视差，上传图片后会重新生成模糊背景纹理，尽量贴近原仓库的玻璃雨滴感。</p>
+      </aside>
+    </header>
+
+    <main class="stage-wrap">
+      <section id="stage" class="stage" aria-label="雨窗互动区域">
+        <canvas id="baseCanvas" aria-hidden="true"></canvas>
+        <canvas id="rainCanvas" aria-hidden="true"></canvas>
+        <div id="rainFallback" class="rain-fallback" aria-hidden="true"></div>
+        <canvas id="fogCanvas" aria-label="可擦除的玻璃雾面"></canvas>
+        <div class="stage-hud" aria-hidden="true">
+          <div class="hud-pill"><strong>模式</strong> 哈气擦雾 <span id="wipeHud">18 px</span></div>
+          <div class="hud-pill" id="statusHud">rain 渲染准备中</div>
+        </div>
+      </section>
+    </main>
+
+    <section class="toolbar">
+      <div class="toolbar-grid">
+        <div class="panel panel-action">
+          <h2 class="panel-title">雾面控制</h2>
+          <div class="row">
+            <button id="clearBtn" class="btn warn" type="button">重新起雾</button>
+            <button id="resetSceneBtn" class="btn" type="button">重置当前底图</button>
+          </div>
+          <div class="slider-wrap">
+            <span>擦除宽度 <strong id="brushValue">18</strong></span>
+            <input id="brushSize" type="range" min="8" max="52" step="1" value="18" aria-label="擦除宽度">
+          </div>
+          <p class="hint">绘画和选色已经移除，只保留羽化擦除。擦除使用 <code>destination-out</code> + <code>blur(5px)</code>，并限制单主指针，减少移动端误触和页面滚动冲突。</p>
+        </div>
+
+        <div class="panel panel-image">
+          <h2 class="panel-title">底图与雨滴</h2>
+          <div class="row">
+            <button class="btn is-active preset-btn" type="button" data-preset="night">雨夜街灯</button>
+            <button class="btn preset-btn" type="button" data-preset="neon">霓虹橱窗</button>
+            <button class="btn preset-btn" type="button" data-preset="desk">暖灯书桌</button>
+          </div>
+          <div class="row">
+            <button id="assetImageBtn" class="btn" type="button">默认底图</button>
+            <label class="upload-label" for="imageUpload">上传图片</label>
+            <input id="imageUpload" type="file" accept="image/*">
+          </div>
+          <div class="slider-wrap">
+            <span>雨量 <strong id="rainAmountValue">65%</strong></span>
+            <input id="rainAmount" type="range" min="20" max="100" step="1" value="65" aria-label="雨量强度">
+          </div>
+          <p class="hint">雨滴逻辑参考仓库：液体图由滴落、拖尾、碰撞合并组成，背景则拆成前景清晰纹理和背景模糊纹理供折射采样。</p>
+        </div>
+
+        <div class="panel panel-audio">
+          <h2 class="panel-title">环境音</h2>
+          <div class="row">
+            <button id="audioToggle" class="btn" type="button">播放当前音频</button>
+            <span id="audioState" class="note">请选择一首内置音频</span>
+          </div>
+          <div id="trackList" class="track-list" aria-label="内置音频列表"></div>
+          <div class="slider-wrap">
+            <span>音量 <strong id="volumeValue">45%</strong></span>
+            <input id="volumeSlider" type="range" min="0" max="100" step="1" value="45" aria-label="环境音音量">
+          </div>
+          <p class="hint">列表里的曲目会随网页一起提供给用户使用。两首内置歌曲读取项目内的音频文件，网页合成雨声也保留成一个可选项。</p>
+        </div>
+      </div>
+      <div id="liveRegion" class="sr-only" aria-live="polite"></div>
+    </section>
+  </div>
+  <audio id="musicPlayer" preload="metadata"></audio>
+
+  <script>
+    const stage = document.getElementById("stage");
+    const baseCanvas = document.getElementById("baseCanvas");
+    const rainCanvas = document.getElementById("rainCanvas");
+    const rainFallback = document.getElementById("rainFallback");
+    const fogCanvas = document.getElementById("fogCanvas");
+    const baseCtx = baseCanvas.getContext("2d");
+    const fogCtx = fogCanvas.getContext("2d");
+
+    const clearBtn = document.getElementById("clearBtn");
+    const resetSceneBtn = document.getElementById("resetSceneBtn");
+    const brushSizeInput = document.getElementById("brushSize");
+    const brushValue = document.getElementById("brushValue");
+    const wipeHud = document.getElementById("wipeHud");
+    const statusHud = document.getElementById("statusHud");
+    const imageUpload = document.getElementById("imageUpload");
+    const assetImageBtn = document.getElementById("assetImageBtn");
+    const audioToggle = document.getElementById("audioToggle");
+    const audioState = document.getElementById("audioState");
+    const trackList = document.getElementById("trackList");
+    const musicPlayer = document.getElementById("musicPlayer");
+    const volumeSlider = document.getElementById("volumeSlider");
+    const volumeValue = document.getElementById("volumeValue");
+    const liveRegion = document.getElementById("liveRegion");
+    const rainAmountInput = document.getElementById("rainAmount");
+    const rainAmountValue = document.getElementById("rainAmountValue");
+
+    const presetButtons = Array.from(document.querySelectorAll(".preset-btn"));
+
+    const state = {
+      dpr: Math.max(1, Math.min(window.devicePixelRatio || 1, 2)),
+      wipeSize: Number(brushSizeInput.value),
+      activePointerId: null,
+      isWiping: false,
+      pointerStartX: 0,
+      pointerStartY: 0,
+      lastPoint: null,
+      currentStroke: null,
+      strokes: [],
+      currentScene: "night",
+      currentSource: null,
+      pointerParallaxX: 0,
+      pointerParallaxY: 0,
+      targetParallaxX: 0,
+      targetParallaxY: 0,
+      rainIntensity: Number(rainAmountInput.value) / 100
+    };
+
+    const rainTextureConfig = {
+      bg: {
+        width: 384,
+        height: 256,
+        blur: 3,
+        brightness: 1.2,
+        saturation: 0.8,
+        tint: { r: 212, g: 234, b: 240 },
+        tintOpacity: 0.12
+      },
+      fg: {
+        width: 192,
+        height: 128,
+        blur: 0,
+        brightness: 1.2,
+        saturation: 0.8,
+        tint: { r: 212, g: 234, b: 240 },
+        tintOpacity: 0.12
+      }
+    };
+
+    const textureBgSize = {
+      width: 384,
+      height: 256
+    };
+
+    const textureFgSize = {
+      width: 192,
+      height: 128
+    };
+
+    const assetPath = (path) => `./public/${path}`;
+
+    const LOCAL_DROP_ALPHA = assetPath("img/drop-alpha.png");
+    const LOCAL_DROP_COLOR = assetPath("img/drop-color.png");
+    const LOCAL_TEXTURE_FG = assetPath("generated/texture-fg.png");
+    const LOCAL_TEXTURE_BG = assetPath("generated/texture-bg.png");
+
+    const builtInTracks = [
+      {
+        id: "track-mask-rain",
+        type: "file",
+        title: "Beneath the Mask - rain instrumental",
+        subtitle: "项目内置曲目",
+        src: "./Beneath%20the%20Mask%20-rain,%20instrumental%20version-(1).mp3"
+      },
+      {
+        id: "track-mask",
+        type: "file",
+        title: "Beneath the Mask",
+        subtitle: "项目内置曲目",
+        src: "./Beneath%20the%20Mask.mp3"
+      },
+      {
+        id: "track-rain",
+        type: "synth",
+        title: "网页合成雨声",
+        subtitle: "无需外部文件",
+        src: null
+      }
+    ];
+
+    const audioEngine = {
+      context: null,
+      masterGain: null,
+      rainGain: null,
+      rainSource: null,
+      lfo: null,
+      lfoGain: null,
+      dropletTimer: null,
+      isPlaying: false,
+      volume: Number(volumeSlider.value) / 100,
+      currentTrackId: builtInTracks[0].id
+    };
+
+    const runtime = {
+      textureFg: document.createElement("canvas"),
+      textureBg: document.createElement("canvas"),
+      textureFgCtx: null,
+      textureBgCtx: null,
+      dropAlphaSource: null,
+      dropColorSource: null,
+      raindrops: null,
+      renderer: null,
+      fallbackTextureReady: false,
+      webgpuEnabled: false,
+      parallaxRaf: 0,
+      resizeQueued: false
+    };
+
+    // 参考仓库 RainEffect：这里直接内联当前本地 rain/src/water.wgsl。
+    // 这一版着色器不是简单做一个透明叠层，而是把液体图 waterMap 的 RGBA
+    // 解释为法线方向、厚度与可见度，再去采样前景/背景纹理做折射与边缘阴影。
+    // 下方 writeUniforms() 会严格按 Uniforms 的字段顺序写入，保证 JS 与 WGSL 对齐。
+    const waterShader = `
+struct Uniforms {
+  resolution: vec2f,
+  parallax: vec2f,
+  parallaxFg: f32,
+  parallaxBg: f32,
+  textureRatio: f32,
+  renderShine: f32,
+  renderShadow: f32,
+  minRefraction: f32,
+  refractionDelta: f32,
+  brightness: f32,
+  alphaMultiply: f32,
+  alphaSubtract: f32,
+  _pad0: f32,
+}
+
+@group(0) @binding(0) var waterMap: texture_2d<f32>;
+@group(0) @binding(1) var textureShine: texture_2d<f32>;
+@group(0) @binding(2) var textureFg: texture_2d<f32>;
+@group(0) @binding(3) var textureBg: texture_2d<f32>;
+@group(0) @binding(4) var linearSampler: sampler;
+@group(0) @binding(5) var<uniform> uniforms: Uniforms;
+
+struct VertexOut {
+  @builtin(position) position: vec4f,
+}
+
+@vertex
+fn vs(@builtin(vertex_index) vertexIndex: u32) -> VertexOut {
+  var positions = array<vec2f, 6>(
+    vec2f(-1.0, -1.0),
+    vec2f(1.0, -1.0),
+    vec2f(-1.0, 1.0),
+    vec2f(-1.0, 1.0),
+    vec2f(1.0, -1.0),
+    vec2f(1.0, 1.0),
+  );
+
+  var out: VertexOut;
+  out.position = vec4f(positions[vertexIndex], 0.0, 1.0);
+  return out;
+}
+
+fn blend(bg: vec4f, fg: vec4f) -> vec4f {
+  let bgm = bg.rgb * bg.a;
+  let fgm = fg.rgb * fg.a;
+  let ia = 1.0 - fg.a;
+  let a = fg.a + bg.a * ia;
+  var rgb = vec3f(0.0);
+  if (a != 0.0) {
+    rgb = (fgm + bgm * ia) / a;
+  }
+  return vec4f(rgb, a);
+}
+
+fn pixel() -> vec2f {
+  return vec2f(1.0) / uniforms.resolution;
+}
+
+fn parallax(v: f32) -> vec2f {
+  return uniforms.parallax * pixel() * v;
+}
+
+fn texCoord(fragCoord: vec4f) -> vec2f {
+  return fragCoord.xy / uniforms.resolution;
+}
+
+fn scaledTexCoord(fragCoord: vec4f) -> vec2f {
+  let ratio = uniforms.resolution.x / uniforms.resolution.y;
+  var scale = vec2f(1.0, 1.0);
+  var offset = vec2f(0.0, 0.0);
+  let ratioDelta = ratio - uniforms.textureRatio;
+
+  if (ratioDelta >= 0.0) {
+    scale.y = 1.0 + ratioDelta;
+    offset.y = ratioDelta / 2.0;
+  } else {
+    scale.x = 1.0 - ratioDelta;
+    offset.x = -ratioDelta / 2.0;
+  }
+
+  return (texCoord(fragCoord) + offset) / scale;
+}
+
+fn fgColor(fragCoord: vec4f, x: f32, y: f32) -> vec4f {
+  let p2 = uniforms.parallaxFg * 2.0;
+  let scale = vec2f(
+    (uniforms.resolution.x + p2) / uniforms.resolution.x,
+    (uniforms.resolution.y + p2) / uniforms.resolution.y,
+  );
+  let scaledCoord = texCoord(fragCoord) / scale;
+  let offset = vec2f(
+    (1.0 - (1.0 / scale.x)) / 2.0,
+    (1.0 - (1.0 / scale.y)) / 2.0,
+  );
+
+  return textureSample(
+    waterMap,
+    linearSampler,
+    (scaledCoord + offset) + (pixel() * vec2f(x, y)) + parallax(uniforms.parallaxFg),
+  );
+}
+
+@fragment
+fn fs(@builtin(position) fragCoord: vec4f) -> @location(0) vec4f {
+  let bg = textureSample(textureBg, linearSampler, scaledTexCoord(fragCoord) + parallax(uniforms.parallaxBg));
+  let cur = fgColor(fragCoord, 0.0, 0.0);
+  let d = cur.b;
+  let x = cur.g;
+  let y = cur.r;
+  let a = clamp(cur.a * uniforms.alphaMultiply - uniforms.alphaSubtract, 0.0, 1.0);
+  let refraction = (vec2f(x, y) - vec2f(0.5)) * 2.0;
+  let refractionParallax = parallax(uniforms.parallaxBg - uniforms.parallaxFg);
+  let refractionPos = scaledTexCoord(fragCoord)
+    + (pixel() * refraction * (uniforms.minRefraction + (d * uniforms.refractionDelta)))
+    + refractionParallax;
+
+  var tex = textureSample(textureFg, linearSampler, refractionPos);
+
+  if (uniforms.renderShine > 0.5) {
+    let maxShine = 490.0;
+    let minShine = maxShine * 0.18;
+    let shinePos = vec2f(0.5, 0.5) + ((1.0 / 512.0) * refraction) * -(minShine + ((maxShine - minShine) * d));
+    let shine = textureSample(textureShine, linearSampler, shinePos);
+    tex = blend(tex, shine);
+  }
+
+  var fg = vec4f(tex.rgb * uniforms.brightness, a);
+
+  if (uniforms.renderShadow > 0.5) {
+    var borderAlpha = fgColor(fragCoord, 0.0, 0.0 - (d * 6.0)).a;
+    borderAlpha = borderAlpha * uniforms.alphaMultiply - (uniforms.alphaSubtract + 0.5);
+    borderAlpha = clamp(borderAlpha, 0.0, 1.0);
+    borderAlpha *= 0.2;
+    let border = vec4f(0.0, 0.0, 0.0, borderAlpha);
+    fg = blend(border, fg);
+  }
+
+  return blend(bg, fg);
+}
+`;
+
+    // 参考仓库 RainEffect：这些默认值来自当前本地 rain/src/rain-renderer.ts，
+    // 用来控制折射强度、前后景视差和 alpha 映射。
+    const RAIN_RENDERER_DEFAULTS = {
+      renderShadow: false,
+      minRefraction: 256,
+      maxRefraction: 512,
+      brightness: 1,
+      alphaMultiply: 20,
+      alphaSubtract: 5,
+      parallaxBg: 5,
+      parallaxFg: 20
+    };
+
+    function announce(message) {
+      statusHud.textContent = message;
+      liveRegion.textContent = message;
+    }
+
+    function random(from = null, to = null, interpolation = null) {
+      if (from == null) {
+        from = 0;
+        to = 1;
+      } else if (to == null) {
+        to = from;
+        from = 0;
+      }
+      const delta = to - from;
+      const curve = interpolation || ((value) => value);
+      return from + curve(Math.random()) * delta;
+    }
+
+    function chance(value) {
+      return random() <= value;
+    }
+
+    function times(n, fn) {
+      for (let i = 0; i < n; i += 1) {
+        fn(i);
+      }
+    }
+
+    function createCanvas(width, height) {
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.floor(width));
+      canvas.height = Math.max(1, Math.floor(height));
+      return canvas;
+    }
+
+    function lerp(current, target, amount) {
+      return current + (target - current) * amount;
+    }
+
+    function coverRect(sourceWidth, sourceHeight, targetWidth, targetHeight) {
+      const scale = Math.max(targetWidth / sourceWidth, targetHeight / sourceHeight);
+      const drawWidth = sourceWidth * scale;
+      const drawHeight = sourceHeight * scale;
+      return {
+        x: (targetWidth - drawWidth) / 2,
+        y: (targetHeight - drawHeight) / 2,
+        drawWidth,
+        drawHeight
+      };
+    }
+
+    function roundRect(ctx, x, y, width, height, radius) {
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.arcTo(x + width, y, x + width, y + height, radius);
+      ctx.arcTo(x + width, y + height, x, y + height, radius);
+      ctx.arcTo(x, y + height, x, y, radius);
+      ctx.arcTo(x, y, x + width, y, radius);
+      ctx.closePath();
+    }
+
+    function fitCanvas(canvas, ctx) {
+      const rect = stage.getBoundingClientRect();
+      const width = Math.max(1, Math.round(rect.width));
+      const height = Math.max(1, Math.round(rect.height));
+      canvas.width = Math.round(width * state.dpr);
+      canvas.height = Math.round(height * state.dpr);
+      ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
+    }
+
+    function fitCanvasSizeOnly(canvas) {
+      const rect = stage.getBoundingClientRect();
+      const width = Math.max(1, Math.round(rect.width));
+      const height = Math.max(1, Math.round(rect.height));
+      canvas.width = Math.round(width * state.dpr);
+      canvas.height = Math.round(height * state.dpr);
+    }
+
+    function get2dContext(canvas) {
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        throw new Error("无法获取 2D canvas context");
+      }
+      return ctx;
+    }
+
+    function drawBaseImage() {
+      const width = baseCanvas.width / state.dpr;
+      const height = baseCanvas.height / state.dpr;
+      baseCtx.clearRect(0, 0, width, height);
+      if (!state.currentSource) {
+        return;
+      }
+      const fit = coverRect(state.currentSource.width, state.currentSource.height, width, height);
+      baseCtx.drawImage(state.currentSource, fit.x, fit.y, fit.drawWidth, fit.drawHeight);
+    }
+
+    function paintNightScene(ctx, width, height) {
+      const sky = ctx.createLinearGradient(0, 0, 0, height);
+      sky.addColorStop(0, "#21335d");
+      sky.addColorStop(0.45, "#16223d");
+      sky.addColorStop(1, "#06080f");
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, width, height);
+
+      const moonGlow = ctx.createRadialGradient(width * 0.77, height * 0.18, 0, width * 0.77, height * 0.18, width * 0.18);
+      moonGlow.addColorStop(0, "rgba(255,218,150,0.30)");
+      moonGlow.addColorStop(0.26, "rgba(255,197,112,0.16)");
+      moonGlow.addColorStop(1, "rgba(255,185,96,0)");
+      ctx.fillStyle = moonGlow;
+      ctx.fillRect(0, 0, width, height);
+
+      const roadY = height * 0.78;
+      const road = ctx.createLinearGradient(0, roadY, 0, height);
+      road.addColorStop(0, "#0e1017");
+      road.addColorStop(1, "#020409");
+      ctx.fillStyle = road;
+      ctx.beginPath();
+      ctx.moveTo(width * 0.18, roadY);
+      ctx.lineTo(width * 0.82, roadY);
+      ctx.lineTo(width, height);
+      ctx.lineTo(0, height);
+      ctx.closePath();
+      ctx.fill();
+
+      for (let layer = 0; layer < 3; layer += 1) {
+        const depth = 0.24 + layer * 0.11;
+        for (let i = 0; i < 10; i += 1) {
+          const buildingWidth = width * (0.06 + ((i + layer) % 3) * 0.028);
+          const buildingHeight = height * (0.24 + ((i * 11 + layer * 17) % 8) * 0.05 + depth * 0.08);
+          const x = i * width * 0.11 - layer * width * 0.025;
+          const y = roadY - buildingHeight + layer * 12;
+          ctx.fillStyle = `rgba(${12 + layer * 6}, ${18 + layer * 10}, ${30 + layer * 14}, ${0.76 - layer * 0.12})`;
+          ctx.fillRect(x, y, buildingWidth, buildingHeight);
+
+          const rows = Math.max(4, Math.floor(buildingHeight / 70));
+          const cols = Math.max(2, Math.floor(buildingWidth / 26));
+          for (let row = 0; row < rows; row += 1) {
+            for (let col = 0; col < cols; col += 1) {
+              if ((row + col + i + layer) % 3 !== 0) {
+                continue;
+              }
+              ctx.fillStyle = `rgba(255, 212, 134, ${0.16 + Math.random() * 0.24})`;
+              ctx.fillRect(x + 8 + col * 18, y + 12 + row * 22, 8, 11);
+            }
+          }
+        }
+      }
+
+      const lamps = [
+        [0.25, 0.73, "#ffd799", "rgba(255, 215, 153, 0.45)"],
+        [0.52, 0.69, "#ffbf6f", "rgba(255, 191, 111, 0.45)"],
+        [0.73, 0.74, "#ffcf83", "rgba(255, 207, 131, 0.45)"]
+      ];
+
+      lamps.forEach(([lx, ly, color, glowColor], index) => {
+        const x = width * lx;
+        const y = height * ly;
+        ctx.strokeStyle = "rgba(24,28,38,0.9)";
+        ctx.lineWidth = width * 0.005;
+        ctx.beginPath();
+        ctx.moveTo(x, y + height * 0.02);
+        ctx.lineTo(x, height * 0.92);
+        ctx.stroke();
+
+        const glow = ctx.createRadialGradient(x, y, 0, x, y, width * 0.11);
+        glow.addColorStop(0, "rgba(255,245,220,0.75)");
+        glow.addColorStop(0.28, glowColor);
+        glow.addColorStop(1, "rgba(255,190,100,0)");
+        ctx.fillStyle = glow;
+        ctx.fillRect(x - width * 0.12, y - width * 0.12, width * 0.24, width * 0.24);
+
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(x, y, width * 0.009 + index, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = `rgba(255, 198, 118, ${0.11 + index * 0.03})`;
+        ctx.beginPath();
+        ctx.moveTo(x - width * 0.018, roadY + 10);
+        ctx.lineTo(x + width * 0.018, roadY + 10);
+        ctx.lineTo(x + width * 0.07, height);
+        ctx.lineTo(x - width * 0.07, height);
+        ctx.closePath();
+        ctx.fill();
+      });
+
+      const vignette = ctx.createLinearGradient(0, 0, 0, height);
+      vignette.addColorStop(0, "rgba(0,0,0,0)");
+      vignette.addColorStop(0.72, "rgba(0,0,0,0.08)");
+      vignette.addColorStop(1, "rgba(0,0,0,0.28)");
+      ctx.fillStyle = vignette;
+      ctx.fillRect(0, 0, width, height);
+    }
+
+    function paintNeonScene(ctx, width, height) {
+      const bg = ctx.createLinearGradient(0, 0, 0, height);
+      bg.addColorStop(0, "#26163e");
+      bg.addColorStop(0.42, "#121b37");
+      bg.addColorStop(1, "#05070f");
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.fillStyle = "rgba(22, 28, 42, 0.9)";
+      ctx.fillRect(0, height * 0.68, width, height * 0.32);
+
+      for (let i = 0; i < 8; i += 1) {
+        const x = width * 0.04 + i * width * 0.12;
+        const w = width * (0.08 + (i % 3) * 0.02);
+        const h = height * (0.34 + (i % 4) * 0.07);
+        const y = height * 0.68 - h;
+        ctx.fillStyle = `rgba(${8 + i * 3}, ${12 + i * 2}, ${20 + i * 3}, 0.88)`;
+        ctx.fillRect(x, y, w, h);
+
+        const signColor = ["#65e1ff", "#fe77c8", "#7c8eff"][i % 3];
+        for (let j = 0; j < 3; j += 1) {
+          const sy = y + 30 + j * 56;
+          const glow = ctx.createLinearGradient(x, sy, x + w, sy);
+          glow.addColorStop(0, "rgba(255,255,255,0)");
+          glow.addColorStop(0.5, signColor + "cc");
+          glow.addColorStop(1, "rgba(255,255,255,0)");
+          ctx.fillStyle = glow;
+          ctx.fillRect(x + 10, sy, w - 20, 10 + j * 2);
+        }
+      }
+
+      const windowFrameX = width * 0.17;
+      const windowFrameY = height * 0.16;
+      const windowFrameW = width * 0.66;
+      const windowFrameH = height * 0.5;
+      ctx.fillStyle = "rgba(10, 14, 22, 0.6)";
+      roundRect(ctx, windowFrameX, windowFrameY, windowFrameW, windowFrameH, 24);
+      ctx.fill();
+
+      ctx.strokeStyle = "rgba(255,255,255,0.12)";
+      ctx.lineWidth = width * 0.004;
+      roundRect(ctx, windowFrameX, windowFrameY, windowFrameW, windowFrameH, 24);
+      ctx.stroke();
+
+      const signGlow = ctx.createRadialGradient(width * 0.5, height * 0.34, 10, width * 0.5, height * 0.34, width * 0.22);
+      signGlow.addColorStop(0, "rgba(255, 112, 190, 0.42)");
+      signGlow.addColorStop(0.45, "rgba(101, 225, 255, 0.18)");
+      signGlow.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = signGlow;
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.font = `700 ${Math.round(width * 0.07)}px Inter, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.shadowBlur = 28;
+      ctx.shadowColor = "#65e1ff";
+      ctx.fillStyle = "#effcff";
+      ctx.fillText("OPEN", width * 0.5, height * 0.34);
+
+      ctx.shadowColor = "#ff6fbb";
+      ctx.font = `600 ${Math.round(width * 0.034)}px Inter, sans-serif`;
+      ctx.fillStyle = "#ffd2ef";
+      ctx.fillText("Midnight Cafe", width * 0.5, height * 0.42);
+      ctx.shadowBlur = 0;
+    }
+
+    function paintDeskScene(ctx, width, height) {
+      const bg = ctx.createLinearGradient(0, 0, 0, height);
+      bg.addColorStop(0, "#43271e");
+      bg.addColorStop(0.42, "#24172b");
+      bg.addColorStop(1, "#090b13");
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, width, height);
+
+      const windowX = width * 0.14;
+      const windowY = height * 0.14;
+      const windowW = width * 0.58;
+      const windowH = height * 0.46;
+      ctx.fillStyle = "rgba(23, 27, 40, 0.82)";
+      roundRect(ctx, windowX, windowY, windowW, windowH, 22);
+      ctx.fill();
+
+      ctx.strokeStyle = "rgba(255,255,255,0.11)";
+      ctx.lineWidth = width * 0.004;
+      roundRect(ctx, windowX, windowY, windowW, windowH, 22);
+      ctx.stroke();
+
+      const outside = ctx.createLinearGradient(windowX, windowY, windowX, windowY + windowH);
+      outside.addColorStop(0, "#24375e");
+      outside.addColorStop(0.54, "#18243d");
+      outside.addColorStop(1, "#0a1019");
+      ctx.fillStyle = outside;
+      ctx.fillRect(windowX + 10, windowY + 10, windowW - 20, windowH - 20);
+
+      for (let i = 0; i < 7; i += 1) {
+        const bx = windowX + 16 + i * ((windowW - 40) / 7);
+        const bw = 34 + (i % 3) * 12;
+        const bh = windowH * (0.25 + (i % 4) * 0.1);
+        const by = windowY + windowH - 20 - bh;
+        ctx.fillStyle = `rgba(10, 14, 22, ${0.8 - (i % 2) * 0.08})`;
+        ctx.fillRect(bx, by, bw, bh);
+        ctx.fillStyle = "rgba(255, 207, 138, 0.18)";
+        ctx.fillRect(bx + 8, by + 18, 8, 10);
+        ctx.fillRect(bx + 20, by + 42, 8, 10);
+      }
+
+      ctx.fillStyle = "#2b211f";
+      ctx.fillRect(0, height * 0.66, width, height * 0.34);
+      const desk = ctx.createLinearGradient(0, height * 0.7, 0, height);
+      desk.addColorStop(0, "#6b4c39");
+      desk.addColorStop(1, "#3b291f");
+      ctx.fillStyle = desk;
+      ctx.fillRect(0, height * 0.74, width, height * 0.26);
+
+      ctx.fillStyle = "#e7d1b1";
+      ctx.save();
+      ctx.translate(width * 0.34, height * 0.77);
+      ctx.rotate(-0.11);
+      roundRect(ctx, -width * 0.11, -height * 0.02, width * 0.22, height * 0.14, 12);
+      ctx.fill();
+      ctx.restore();
+
+      ctx.fillStyle = "#141a22";
+      roundRect(ctx, width * 0.54, height * 0.68, width * 0.16, height * 0.14, 14);
+      ctx.fill();
+      ctx.fillStyle = "#0f1728";
+      ctx.fillRect(width * 0.555, height * 0.695, width * 0.13, height * 0.09);
+      ctx.fillStyle = "rgba(85, 196, 255, 0.24)";
+      ctx.fillRect(width * 0.565, height * 0.705, width * 0.11, height * 0.07);
+
+      ctx.fillStyle = "#f5cf8f";
+      ctx.fillRect(width * 0.77, height * 0.48, width * 0.016, height * 0.25);
+      const lampGlow = ctx.createRadialGradient(width * 0.778, height * 0.46, 10, width * 0.778, height * 0.46, width * 0.18);
+      lampGlow.addColorStop(0, "rgba(255,244,214,0.75)");
+      lampGlow.addColorStop(0.25, "rgba(255,215,141,0.42)");
+      lampGlow.addColorStop(1, "rgba(255,189,96,0)");
+      ctx.fillStyle = lampGlow;
+      ctx.fillRect(width * 0.62, height * 0.28, width * 0.32, height * 0.36);
+    }
+
+    function generateScene(name) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1600;
+      canvas.height = 2400;
+      const ctx = get2dContext(canvas);
+
+      if (name === "neon") {
+        paintNeonScene(ctx, canvas.width, canvas.height);
+      } else if (name === "desk") {
+        paintDeskScene(ctx, canvas.width, canvas.height);
+      } else {
+        paintNightScene(ctx, canvas.width, canvas.height);
+      }
+
+      for (let i = 0; i < 120; i += 1) {
+        const x = Math.random() * canvas.width;
+        const y = Math.random() * canvas.height * 0.55;
+        const star = ctx.createRadialGradient(x, y, 0, x, y, 10 + Math.random() * 12);
+        star.addColorStop(0, `rgba(255,255,255,${0.16 + Math.random() * 0.18})`);
+        star.addColorStop(1, "rgba(255,255,255,0)");
+        ctx.fillStyle = star;
+        ctx.beginPath();
+        ctx.arc(x, y, 8 + Math.random() * 8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      return canvas;
+    }
+
+    function sprinkleMist(width, height) {
+      const mist = fogCtx.createLinearGradient(0, 0, 0, height);
+      mist.addColorStop(0, "rgba(228, 237, 255, 0.46)");
+      mist.addColorStop(0.38, "rgba(196, 207, 235, 0.24)");
+      mist.addColorStop(1, "rgba(34, 50, 92, 0.3)");
+      fogCtx.fillStyle = mist;
+      fogCtx.fillRect(0, 0, width, height);
+
+      for (let i = 0; i < 220; i += 1) {
+        const x = Math.random() * width;
+        const y = Math.random() * height;
+        const radius = 0.4 + Math.random() * 1.8;
+        fogCtx.fillStyle = `rgba(255,255,255,${0.012 + Math.random() * 0.035})`;
+        fogCtx.beginPath();
+        fogCtx.arc(x, y, radius, 0, Math.PI * 2);
+        fogCtx.fill();
+      }
+
+      for (let i = 0; i < 36; i += 1) {
+        const x = Math.random() * width;
+        const y = Math.random() * height;
+        const radius = 8 + Math.random() * 18;
+        const halo = fogCtx.createRadialGradient(x, y, 0, x, y, radius);
+        halo.addColorStop(0, "rgba(255,255,255,0.06)");
+        halo.addColorStop(1, "rgba(255,255,255,0)");
+        fogCtx.fillStyle = halo;
+        fogCtx.beginPath();
+        fogCtx.arc(x, y, radius, 0, Math.PI * 2);
+        fogCtx.fill();
+      }
+    }
+
+    function drawEraseSegment(size, from, to) {
+      fogCtx.save();
+      fogCtx.globalCompositeOperation = "destination-out";
+      fogCtx.filter = "blur(5px)";
+      fogCtx.strokeStyle = "rgba(0, 0, 0, 1)";
+      fogCtx.lineWidth = size * 1.18;
+      fogCtx.lineCap = "round";
+      fogCtx.lineJoin = "round";
+      fogCtx.beginPath();
+      fogCtx.moveTo(from.x, from.y);
+      fogCtx.lineTo(to.x, to.y);
+      fogCtx.stroke();
+      fogCtx.beginPath();
+      fogCtx.arc(to.x, to.y, Math.max(1, fogCtx.lineWidth / 2), 0, Math.PI * 2);
+      fogCtx.fillStyle = "rgba(0, 0, 0, 1)";
+      fogCtx.fill();
+      fogCtx.restore();
+    }
+
+    function pointToRelative(point) {
+      const width = fogCanvas.width / state.dpr;
+      const height = fogCanvas.height / state.dpr;
+      return {
+        x: Number((point.x / width).toFixed(5)),
+        y: Number((point.y / height).toFixed(5))
+      };
+    }
+
+    function relativeToPoint(point) {
+      const width = fogCanvas.width / state.dpr;
+      const height = fogCanvas.height / state.dpr;
+      return {
+        x: point.x * width,
+        y: point.y * height
+      };
+    }
+
+    function replayStrokes() {
+      state.strokes.forEach((stroke) => {
+        if (stroke.points.length === 1) {
+          const point = relativeToPoint(stroke.points[0]);
+          drawEraseSegment(stroke.size, point, point);
+          return;
+        }
+
+        for (let index = 1; index < stroke.points.length; index += 1) {
+          drawEraseSegment(
+            stroke.size,
+            relativeToPoint(stroke.points[index - 1]),
+            relativeToPoint(stroke.points[index])
+          );
+        }
+      });
+    }
+
+    function rebuildFogCanvas() {
+      const width = fogCanvas.width / state.dpr;
+      const height = fogCanvas.height / state.dpr;
+      fogCtx.clearRect(0, 0, width, height);
+      fogCtx.save();
+      fogCtx.filter = "blur(18px) brightness(0.74) saturate(0.94)";
+      fogCtx.drawImage(baseCanvas, 0, 0, width, height);
+      fogCtx.restore();
+      fogCtx.fillStyle = "rgba(17, 28, 47, 0.3)";
+      fogCtx.fillRect(0, 0, width, height);
+      sprinkleMist(width, height);
+      replayStrokes();
+    }
+
+    function clearArtwork(message = "雾面已恢复") {
+      state.strokes = [];
+      rebuildFogCanvas();
+      announce(message);
+    }
+
+    function setBrushSize(value) {
+      state.wipeSize = Number(value);
+      brushValue.textContent = value;
+      wipeHud.textContent = `${value} px`;
+    }
+
+    function getPointFromEvent(event) {
+      const rect = fogCanvas.getBoundingClientRect();
+      return {
+        x: Math.min(rect.width, Math.max(0, event.clientX - rect.left)),
+        y: Math.min(rect.height, Math.max(0, event.clientY - rect.top))
+      };
+    }
+
+    function startWipe(point) {
+      state.isWiping = true;
+      state.lastPoint = point;
+      state.currentStroke = {
+        size: state.wipeSize,
+        points: [pointToRelative(point)]
+      };
+      drawEraseSegment(state.wipeSize, point, point);
+    }
+
+    function extendWipe(point) {
+      if (!state.isWiping || !state.lastPoint || !state.currentStroke) {
+        return;
+      }
+      drawEraseSegment(state.currentStroke.size, state.lastPoint, point);
+      state.currentStroke.points.push(pointToRelative(point));
+      state.lastPoint = point;
+    }
+
+    function finishWipe() {
+      if (state.currentStroke && state.currentStroke.points.length) {
+        state.strokes.push(state.currentStroke);
+      }
+      state.isWiping = false;
+      state.lastPoint = null;
+      state.currentStroke = null;
+    }
+
+    function onPointerDown(event) {
+      if (event.target !== fogCanvas || !event.isPrimary) {
+        return;
+      }
+      if (state.activePointerId !== null) {
+        return;
+      }
+      if (event.pointerType === "mouse" && event.button !== 0) {
+        return;
+      }
+
+      event.preventDefault();
+      const point = getPointFromEvent(event);
+      state.activePointerId = event.pointerId;
+      state.pointerStartX = point.x;
+      state.pointerStartY = point.y;
+      fogCanvas.setPointerCapture(event.pointerId);
+      startWipe(point);
+    }
+
+    function onPointerMove(event) {
+      if (!state.isWiping || event.pointerId !== state.activePointerId) {
+        return;
+      }
+      event.preventDefault();
+      const point = getPointFromEvent(event);
+      const dx = point.x - state.pointerStartX;
+      const dy = point.y - state.pointerStartY;
+
+      if (Math.hypot(dx, dy) < 1.2 && state.currentStroke.points.length === 1) {
+        return;
+      }
+
+      extendWipe(point);
+    }
+
+    function onPointerEnd(event) {
+      if (event.pointerId !== state.activePointerId) {
+        return;
+      }
+      event.preventDefault();
+      finishWipe();
+      state.activePointerId = null;
+    }
+
+    function createTextureCanvas(config) {
+      const canvas = createCanvas(config.width, config.height);
+      const ctx = get2dContext(canvas);
+      return { canvas, ctx };
+    }
+
+    function applyTextureConfig(targetCanvas, targetCtx, sourceCanvas, config) {
+      targetCtx.clearRect(0, 0, targetCanvas.width, targetCanvas.height);
+      targetCtx.save();
+      const filterParts = [
+        `brightness(${config.brightness})`,
+        `saturate(${config.saturation})`
+      ];
+      if (config.blur > 0) {
+        filterParts.unshift(`blur(${config.blur}px)`);
+      }
+      targetCtx.filter = filterParts.join(" ");
+      const fit = coverRect(sourceCanvas.width, sourceCanvas.height, targetCanvas.width, targetCanvas.height);
+      targetCtx.drawImage(sourceCanvas, fit.x, fit.y, fit.drawWidth, fit.drawHeight);
+      targetCtx.restore();
+      targetCtx.fillStyle = `rgba(${config.tint.r}, ${config.tint.g}, ${config.tint.b}, ${config.tintOpacity})`;
+      targetCtx.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
+    }
+
+    function updateRainTexturesFromBase() {
+      if (!runtime.textureFgCtx || !runtime.textureBgCtx) {
+        return;
+      }
+      applyTextureConfig(runtime.textureBg, runtime.textureBgCtx, baseCanvas, rainTextureConfig.bg);
+      applyTextureConfig(runtime.textureFg, runtime.textureFgCtx, baseCanvas, rainTextureConfig.fg);
+      if (runtime.renderer) {
+        runtime.renderer.imageFg = runtime.textureFg;
+        runtime.renderer.imageBg = runtime.textureBg;
+        runtime.renderer.updateTextures();
+      }
+      buildFallbackRainTexture();
+    }
+
+    async function loadLocalGeneratedTextures() {
+      const [fgResult, bgResult] = await Promise.allSettled([
+        loadImage(LOCAL_TEXTURE_FG),
+        loadImage(LOCAL_TEXTURE_BG)
+      ]);
+
+      if (fgResult.status !== "fulfilled" || bgResult.status !== "fulfilled") {
+        return false;
+      }
+
+      runtime.textureFgCtx.clearRect(0, 0, runtime.textureFg.width, runtime.textureFg.height);
+      runtime.textureBgCtx.clearRect(0, 0, runtime.textureBg.width, runtime.textureBg.height);
+      runtime.textureFgCtx.drawImage(fgResult.value, 0, 0, textureFgSize.width, textureFgSize.height);
+      runtime.textureBgCtx.drawImage(bgResult.value, 0, 0, textureBgSize.width, textureBgSize.height);
+
+      if (runtime.renderer) {
+        runtime.renderer.imageFg = runtime.textureFg;
+        runtime.renderer.imageBg = runtime.textureBg;
+        runtime.renderer.updateTextures();
+      }
+
+      buildFallbackRainTexture();
+      return true;
+    }
+
+    function loadImage(src) {
+      return new Promise((resolve, reject) => {
+        const image = new Image();
+        image.crossOrigin = "anonymous";
+        image.decoding = "async";
+        image.onload = () => resolve(image);
+        image.onerror = reject;
+        image.src = src;
+      });
+    }
+
+    function createDropAlphaFallback() {
+      const canvas = createCanvas(64, 64);
+      const ctx = get2dContext(canvas);
+      const gradient = ctx.createRadialGradient(32, 24, 1, 32, 30, 28);
+      gradient.addColorStop(0, "rgba(255,255,255,0.98)");
+      gradient.addColorStop(0.45, "rgba(255,255,255,0.8)");
+      gradient.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.ellipse(32, 30, 22, 27, 0, 0, Math.PI * 2);
+      ctx.fill();
+      return canvas;
+    }
+
+    function createDropColorFallback() {
+      const canvas = createCanvas(64, 64);
+      const ctx = get2dContext(canvas);
+      const imageData = ctx.createImageData(canvas.width, canvas.height);
+
+      for (let y = 0; y < canvas.height; y += 1) {
+        for (let x = 0; x < canvas.width; x += 1) {
+          const nx = (x / (canvas.width - 1)) * 2 - 1;
+          const ny = (y / (canvas.height - 1)) * 2 - 1;
+          const distance = Math.sqrt(nx * nx + ny * ny);
+          const inside = Math.max(0, 1 - distance);
+          const index = (y * canvas.width + x) * 4;
+          imageData.data[index] = Math.round((ny * 0.5 + 0.5) * 255);
+          imageData.data[index + 1] = Math.round((nx * 0.5 + 0.5) * 255);
+          imageData.data[index + 2] = Math.round(inside * 180);
+          imageData.data[index + 3] = Math.round(inside * 255);
+        }
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+      return canvas;
+    }
+
+    async function prepareDropAssets() {
+      const [alphaResult, colorResult] = await Promise.allSettled([
+        loadImage(LOCAL_DROP_ALPHA),
+        loadImage(LOCAL_DROP_COLOR)
+      ]);
+
+      runtime.dropAlphaSource = alphaResult.status === "fulfilled" ? alphaResult.value : createDropAlphaFallback();
+      runtime.dropColorSource = colorResult.status === "fulfilled" ? colorResult.value : createDropColorFallback();
+    }
+
+    const DropDefaults = {
+      x: 0,
+      y: 0,
+      r: 0,
+      spreadX: 0,
+      spreadY: 0,
+      momentum: 0,
+      momentumX: 0,
+      lastSpawn: 0,
+      nextSpawn: 0,
+      parent: null,
+      isNew: true,
+      killed: false,
+      shrink: 0
+    };
+
+    class Raindrops {
+      constructor(width, height, scale, dropAlpha, dropColor, options = {}) {
+        this.dropSize = 64;
+        this.defaults = {
+          minR: 10,
+          maxR: 40,
+          maxDrops: 900,
+          rainChance: 0.3,
+          rainLimit: 3,
+          dropletsRate: 50,
+          dropletsSize: [2, 4],
+          dropletsCleaningRadiusMultiplier: 0.43,
+          raining: true,
+          globalTimeScale: 1,
+          trailRate: 1,
+          autoShrink: true,
+          spawnArea: [-0.1, 0.95],
+          trailScaleRange: [0.2, 0.5],
+          collisionRadius: 0.65,
+          collisionRadiusIncrease: 0.01,
+          dropFallMultiplier: 1,
+          collisionBoostMultiplier: 0.05,
+          collisionBoost: 1
+        };
+        this.width = width;
+        this.height = height;
+        this.scale = scale;
+        this.dropAlpha = dropAlpha;
+        this.dropColor = dropColor;
+        this.options = Object.assign({}, this.defaults, options);
+        this.canvas = createCanvas(width, height);
+        this.ctx = get2dContext(this.canvas);
+        this.dropletsPixelDensity = 1;
+        this.droplets = createCanvas(width * this.dropletsPixelDensity, height * this.dropletsPixelDensity);
+        this.dropletsCtx = get2dContext(this.droplets);
+        this.dropletsCounter = 0;
+        this.drops = [];
+        this.dropsGfx = [];
+        this.clearDropletsGfx = createCanvas(128, 128);
+        this.textureCleaningIterations = 0;
+        this.lastRender = null;
+        this.raf = 0;
+        this.renderDropsGfx();
+        this.update();
+      }
+
+      get deltaR() {
+        return this.options.maxR - this.options.minR;
+      }
+
+      get area() {
+        return (this.width * this.height) / this.scale;
+      }
+
+      get areaMultiplier() {
+        return Math.sqrt(this.area / (1024 * 768));
+      }
+
+      resize(width, height, scale) {
+        this.width = width;
+        this.height = height;
+        this.scale = scale;
+        this.canvas.width = Math.max(1, Math.floor(width));
+        this.canvas.height = Math.max(1, Math.floor(height));
+        this.droplets.width = Math.max(1, Math.floor(width * this.dropletsPixelDensity));
+        this.droplets.height = Math.max(1, Math.floor(height * this.dropletsPixelDensity));
+        this.drops = [];
+        this.dropletsCounter = 0;
+        this.lastRender = null;
+      }
+
+      destroy() {
+        cancelAnimationFrame(this.raf);
+      }
+
+      setIntensity(intensity) {
+        this.options.rainChance = 0.18 + intensity * 0.35;
+        this.options.rainLimit = 2 + intensity * 5.2;
+        this.options.dropletsRate = 18 + intensity * 52;
+        this.options.maxDrops = 420 + Math.round(intensity * 700);
+        this.options.collisionBoost = 0.8 + intensity * 0.8;
+        this.options.collisionRadiusIncrease = 0.00015 + intensity * 0.00012;
+      }
+
+      createDrop(options) {
+        if (this.drops.length >= this.options.maxDrops * this.areaMultiplier) {
+          return null;
+        }
+        return Object.assign({}, DropDefaults, options);
+      }
+
+      addDrop(drop) {
+        if (this.drops.length >= this.options.maxDrops * this.areaMultiplier || !drop) {
+          return false;
+        }
+        this.drops.push(drop);
+        return true;
+      }
+
+      clearDrops() {
+        this.drops.forEach((drop) => {
+          window.setTimeout(() => {
+            drop.shrink = 0.1 + random(0.5);
+          }, random(1200));
+        });
+        this.clearTexture();
+      }
+
+      clearTexture() {
+        this.textureCleaningIterations = 50;
+      }
+
+      renderDropsGfx() {
+        const dropBuffer = createCanvas(this.dropSize, this.dropSize);
+        const dropBufferCtx = get2dContext(dropBuffer);
+        this.dropsGfx = Array.from({ length: 255 }, (_, index) => {
+          const drop = createCanvas(this.dropSize, this.dropSize);
+          const dropCtx = get2dContext(drop);
+          dropBufferCtx.clearRect(0, 0, this.dropSize, this.dropSize);
+          dropBufferCtx.globalCompositeOperation = "source-over";
+          dropBufferCtx.drawImage(this.dropColor, 0, 0, this.dropSize, this.dropSize);
+          dropBufferCtx.globalCompositeOperation = "screen";
+          dropBufferCtx.fillStyle = `rgba(0,0,${index},1)`;
+          dropBufferCtx.fillRect(0, 0, this.dropSize, this.dropSize);
+          dropCtx.globalCompositeOperation = "source-over";
+          dropCtx.drawImage(this.dropAlpha, 0, 0, this.dropSize, this.dropSize);
+          dropCtx.globalCompositeOperation = "source-in";
+          dropCtx.drawImage(dropBuffer, 0, 0, this.dropSize, this.dropSize);
+          return drop;
+        });
+
+        const clearDropletsCtx = get2dContext(this.clearDropletsGfx);
+        clearDropletsCtx.fillStyle = "#000";
+        clearDropletsCtx.beginPath();
+        clearDropletsCtx.arc(64, 64, 64, 0, Math.PI * 2);
+        clearDropletsCtx.fill();
+      }
+
+      drawDroplet(x, y, r) {
+        this.drawDrop(this.dropletsCtx, {
+          ...DropDefaults,
+          x: x * this.dropletsPixelDensity,
+          y: y * this.dropletsPixelDensity,
+          r: r * this.dropletsPixelDensity
+        });
+      }
+
+      drawDrop(ctx, drop) {
+        if (!this.dropsGfx.length) {
+          return;
+        }
+        const scaleX = 1;
+        const scaleY = 1.5;
+        let depth = Math.max(0, Math.min(1, ((drop.r - this.options.minR) / this.deltaR) * 0.9));
+        depth *= 1 / ((drop.spreadX + drop.spreadY) * 0.5 + 1);
+        depth = Math.floor(depth * (this.dropsGfx.length - 1));
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = "source-over";
+        ctx.drawImage(
+          this.dropsGfx[depth],
+          (drop.x - drop.r * scaleX * (drop.spreadX + 1)) * this.scale,
+          (drop.y - drop.r * scaleY * (drop.spreadY + 1)) * this.scale,
+          drop.r * 2 * scaleX * (drop.spreadX + 1) * this.scale,
+          drop.r * 2 * scaleY * (drop.spreadY + 1) * this.scale
+        );
+      }
+
+      clearDroplets(x, y, r = 30) {
+        this.dropletsCtx.globalCompositeOperation = "destination-out";
+        this.dropletsCtx.drawImage(
+          this.clearDropletsGfx,
+          (x - r) * this.dropletsPixelDensity * this.scale,
+          (y - r) * this.dropletsPixelDensity * this.scale,
+          r * 2 * this.dropletsPixelDensity * this.scale,
+          r * 2 * this.dropletsPixelDensity * this.scale * 1.5
+        );
+      }
+
+      clearCanvas() {
+        this.ctx.clearRect(0, 0, this.width, this.height);
+      }
+
+      updateRain(timeScale) {
+        const rainDrops = [];
+        if (!this.options.raining) {
+          return rainDrops;
+        }
+        const limit = this.options.rainLimit * timeScale * this.areaMultiplier;
+        let count = 0;
+        while (chance(this.options.rainChance * timeScale * this.areaMultiplier) && count < limit) {
+          count += 1;
+          const r = random(this.options.minR, this.options.maxR, (n) => n ** 3);
+          const rainDrop = this.createDrop({
+            x: random(this.width / this.scale),
+            y: random(
+              (this.height / this.scale) * this.options.spawnArea[0],
+              (this.height / this.scale) * this.options.spawnArea[1]
+            ),
+            r,
+            momentum: 1 + (r - this.options.minR) * 0.1 + random(2),
+            spreadX: 1.5,
+            spreadY: 1.5
+          });
+          if (rainDrop) {
+            rainDrops.push(rainDrop);
+          }
+        }
+        return rainDrops;
+      }
+
+      updateDroplets(timeScale) {
+        if (this.textureCleaningIterations > 0) {
+          this.textureCleaningIterations -= 1 * timeScale;
+          this.dropletsCtx.globalCompositeOperation = "destination-out";
+          this.dropletsCtx.fillStyle = `rgba(0,0,0,${0.05 * timeScale})`;
+          this.dropletsCtx.fillRect(0, 0, this.width * this.dropletsPixelDensity, this.height * this.dropletsPixelDensity);
+        }
+
+        if (this.options.raining) {
+          this.dropletsCounter += this.options.dropletsRate * timeScale * this.areaMultiplier;
+          times(this.dropletsCounter, () => {
+            this.dropletsCounter -= 1;
+            this.drawDroplet(
+              random(this.width / this.scale),
+              random(this.height / this.scale),
+              random(...this.options.dropletsSize, (n) => n * n)
+            );
+          });
+        }
+        this.ctx.drawImage(this.droplets, 0, 0, this.width, this.height);
+      }
+
+      updateDrops(timeScale) {
+        let newDrops = [];
+        this.updateDroplets(timeScale);
+        newDrops = newDrops.concat(this.updateRain(timeScale));
+
+        this.drops.sort((a, b) => {
+          const va = a.y * (this.width / this.scale) + a.x;
+          const vb = b.y * (this.width / this.scale) + b.x;
+          return va > vb ? 1 : va === vb ? 0 : -1;
+        });
+
+        this.drops.forEach((drop, index) => {
+          if (drop.killed) {
+            return;
+          }
+
+          if (
+            chance(
+              (drop.r - this.options.minR * this.options.dropFallMultiplier) *
+                (0.1 / this.deltaR) *
+                timeScale
+            )
+          ) {
+            drop.momentum += random((drop.r / this.options.maxR) * 4);
+          }
+
+          if (this.options.autoShrink && drop.r <= this.options.minR && chance(0.05 * timeScale)) {
+            drop.shrink += 0.01;
+          }
+
+          drop.r -= drop.shrink * timeScale;
+          if (drop.r <= 0) {
+            drop.killed = true;
+          }
+
+          if (this.options.raining) {
+            drop.lastSpawn += drop.momentum * timeScale * this.options.trailRate;
+            if (drop.lastSpawn > drop.nextSpawn) {
+              const trailDrop = this.createDrop({
+                x: drop.x + random(-drop.r, drop.r) * 0.1,
+                y: drop.y - drop.r * 0.01,
+                r: drop.r * random(...this.options.trailScaleRange),
+                spreadY: drop.momentum * 0.1,
+                parent: drop
+              });
+              if (trailDrop) {
+                newDrops.push(trailDrop);
+                drop.r *= 0.97 ** timeScale;
+                drop.lastSpawn = 0;
+                drop.nextSpawn =
+                  random(this.options.minR, this.options.maxR) -
+                  drop.momentum * 2 * this.options.trailRate +
+                  (this.options.maxR - drop.r);
+              }
+            }
+          }
+
+          drop.spreadX *= 0.4 ** timeScale;
+          drop.spreadY *= 0.7 ** timeScale;
+          const moved = drop.momentum > 0;
+
+          if (moved && !drop.killed) {
+            drop.y += drop.momentum * this.options.globalTimeScale;
+            drop.x += drop.momentumX * this.options.globalTimeScale;
+            if (drop.y > this.height / this.scale + drop.r) {
+              drop.killed = true;
+            }
+          }
+
+          const checkCollision = (moved || drop.isNew) && !drop.killed;
+          drop.isNew = false;
+
+          if (checkCollision) {
+            this.drops.slice(index + 1, index + 70).forEach((drop2) => {
+              if (
+                drop !== drop2 &&
+                drop.r > drop2.r &&
+                drop.parent !== drop2 &&
+                drop2.parent !== drop &&
+                !drop2.killed
+              ) {
+                const dx = drop2.x - drop.x;
+                const dy = drop2.y - drop.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                if (
+                  distance <
+                  (drop.r + drop2.r) *
+                    (this.options.collisionRadius +
+                      drop.momentum * this.options.collisionRadiusIncrease * timeScale)
+                ) {
+                  const pi = Math.PI;
+                  const a1 = pi * drop.r * drop.r;
+                  const a2 = pi * drop2.r * drop2.r;
+                  const targetR = Math.sqrt((a1 + a2 * 0.8) / pi);
+                  drop.r = targetR;
+                  drop.momentumX += dx * 0.1;
+                  drop.spreadX = 0;
+                  drop.spreadY = 0;
+                  drop2.killed = true;
+                  drop.momentum = Math.max(
+                    drop2.momentum,
+                    Math.min(
+                      40,
+                      drop.momentum +
+                        targetR * this.options.collisionBoostMultiplier +
+                        this.options.collisionBoost
+                    )
+                  );
+                }
+              }
+            });
+          }
+
+          drop.momentum -= Math.max(1, this.options.minR * 0.5 - drop.momentum) * 0.1 * timeScale;
+          if (drop.momentum < 0) {
+            drop.momentum = 0;
+          }
+          drop.momentumX *= 0.7 ** timeScale;
+
+          if (!drop.killed) {
+            newDrops.push(drop);
+            if (moved && this.options.dropletsRate > 0) {
+              this.clearDroplets(drop.x, drop.y, drop.r * this.options.dropletsCleaningRadiusMultiplier);
+            }
+            this.drawDrop(this.ctx, drop);
+          }
+        });
+
+        this.drops = newDrops;
+      }
+
+      update = () => {
+        this.clearCanvas();
+        const now = Date.now();
+        if (this.lastRender == null) {
+          this.lastRender = now;
+        }
+        const deltaT = now - this.lastRender;
+        let timeScale = deltaT / ((1 / 60) * 1000);
+        if (timeScale > 1.1) {
+          timeScale = 1.1;
+        }
+        timeScale *= this.options.globalTimeScale;
+        this.lastRender = now;
+        this.updateDrops(timeScale);
+        this.raf = requestAnimationFrame(this.update);
+      };
+    }
+
+    // 参考仓库 RainEffect：这一段按当前本地 rain/src/rain-renderer.ts 的职责拆分。
+    // 它只负责 WebGPU 初始化、绑定组管理、uniform 上传和最终折射渲染；
+    // 真正的雨滴状态更新由上面的 Raindrops 在自己的 requestAnimationFrame 中维护。
+    class RainRendererWebGPU {
+      constructor(canvas, canvasLiquid, imageFg, imageBg, imageShine = null, options = {}) {
+        this.canvas = canvas;
+        this.canvasLiquid = canvasLiquid;
+        this.imageFg = imageFg;
+        this.imageBg = imageBg;
+        this.hasShine = imageShine != null;
+        this.imageShine = imageShine || this.createFallbackTextureSource();
+        this.options = Object.assign({}, RAIN_RENDERER_DEFAULTS, options);
+        this.parallaxX = 0;
+        this.parallaxY = 0;
+        this.width = 0;
+        this.height = 0;
+        this.raf = 0;
+        this.initialized = false;
+      }
+
+      static async create(canvas, canvasLiquid, imageFg, imageBg, imageShine = null, options = {}) {
+        const renderer = new RainRendererWebGPU(canvas, canvasLiquid, imageFg, imageBg, imageShine, options);
+        await renderer.init();
+        return renderer;
+      }
+
+      createFallbackTextureSource() {
+        const canvas = createCanvas(2, 2);
+        const ctx = get2dContext(canvas);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        return canvas;
+      }
+
+      sourceSize(source) {
+        if (
+          source instanceof HTMLCanvasElement ||
+          (typeof OffscreenCanvas !== "undefined" && source instanceof OffscreenCanvas)
+        ) {
+          return {
+            width: Math.max(1, source.width),
+            height: Math.max(1, source.height)
+          };
+        }
+        return {
+          width: Math.max(1, source.naturalWidth || source.width),
+          height: Math.max(1, source.naturalHeight || source.height)
+        };
+      }
+
+      async init() {
+        if (!navigator.gpu) {
+          throw new Error("当前浏览器不支持 WebGPU");
+        }
+        const adapter = await navigator.gpu.requestAdapter();
+        if (!adapter) {
+          throw new Error("没有可用的 WebGPU adapter");
+        }
+        const device = await adapter.requestDevice();
+        const context = this.canvas.getContext("webgpu");
+        if (!context) {
+          throw new Error("无法获取 WebGPU canvas context");
+        }
+        this.device = device;
+        this.context = context;
+        this.format = navigator.gpu.getPreferredCanvasFormat();
+        this.width = this.canvas.width;
+        this.height = this.canvas.height;
+        this.context.configure({
+          device: this.device,
+          format: this.format,
+          alphaMode: "opaque"
+        });
+        this.sampler = this.device.createSampler({
+          addressModeU: "clamp-to-edge",
+          addressModeV: "clamp-to-edge",
+          magFilter: "linear",
+          minFilter: "linear"
+        });
+        this.waterTexture = this.createTextureFromSource(this.canvasLiquid);
+        this.shineTexture = this.createTextureFromSource(this.imageShine);
+        this.fgTexture = this.createTextureFromSource(this.imageFg);
+        this.bgTexture = this.createTextureFromSource(this.imageBg);
+        this.uniformBuffer = this.device.createBuffer({
+          size: 64,
+          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+        });
+        const module = this.device.createShaderModule({
+          code: waterShader
+        });
+        // 参考仓库 RainEffect：pipeline 配置沿用仓库的最小全屏三角形方案，
+        // 顶点阶段只输出一个覆盖全屏的矩形，主要计算都放在片元着色器里完成。
+        this.pipeline = this.device.createRenderPipeline({
+          layout: "auto",
+          vertex: {
+            module,
+            entryPoint: "vs"
+          },
+          fragment: {
+            module,
+            entryPoint: "fs",
+            targets: [{ format: this.format }]
+          },
+          primitive: {
+            topology: "triangle-list"
+          }
+        });
+        this.bindGroup = this.createBindGroup();
+        this.initialized = true;
+        this.writeUniforms();
+        this.draw();
+      }
+
+      createTextureFromSource(source) {
+        const size = this.sourceSize(source);
+        const texture = this.device.createTexture({
+          size,
+          format: "rgba8unorm",
+          usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT
+        });
+        this.copySourceToTexture(texture, source);
+        return texture;
+      }
+
+      copySourceToTexture(texture, source) {
+        this.device.queue.copyExternalImageToTexture({ source }, { texture }, this.sourceSize(source));
+      }
+
+      createBindGroup() {
+        return this.device.createBindGroup({
+          layout: this.pipeline.getBindGroupLayout(0),
+          entries: [
+            { binding: 0, resource: this.waterTexture.createView() },
+            { binding: 1, resource: this.shineTexture.createView() },
+            { binding: 2, resource: this.fgTexture.createView() },
+            { binding: 3, resource: this.bgTexture.createView() },
+            { binding: 4, resource: this.sampler },
+            { binding: 5, resource: { buffer: this.uniformBuffer } }
+          ]
+        });
+      }
+
+      updateTextures() {
+        if (!this.initialized) {
+          return;
+        }
+        this.copySourceToTexture(this.fgTexture, this.imageFg);
+        this.copySourceToTexture(this.bgTexture, this.imageBg);
+        this.copySourceToTexture(this.shineTexture, this.imageShine);
+      }
+
+      writeUniforms() {
+        // 参考仓库 RainEffect：这里的写入顺序必须和 waterShader 里的 Uniforms 完全一致，
+        // 否则折射方向、视差和透明度映射都会错位。
+        const bgSize = this.sourceSize(this.imageBg);
+        const bgHeight = bgSize.height || 1;
+        const uniforms = new Float32Array([
+          this.width,
+          this.height,
+          this.parallaxX,
+          this.parallaxY,
+          this.options.parallaxFg,
+          this.options.parallaxBg,
+          bgSize.width / bgHeight,
+          this.hasShine ? 1 : 0,
+          this.options.renderShadow ? 1 : 0,
+          this.options.minRefraction,
+          this.options.maxRefraction - this.options.minRefraction,
+          this.options.brightness,
+          this.options.alphaMultiply,
+          this.options.alphaSubtract,
+          0,
+          0
+        ]);
+        this.device.queue.writeBuffer(this.uniformBuffer, 0, uniforms);
+      }
+
+      resize() {
+        if (!this.initialized) {
+          return;
+        }
+        this.width = this.canvas.width;
+        this.height = this.canvas.height;
+        this.context.configure({
+          device: this.device,
+          format: this.format,
+          alphaMode: "opaque"
+        });
+        this.waterTexture.destroy();
+        this.waterTexture = this.createTextureFromSource(this.canvasLiquid);
+        this.bindGroup = this.createBindGroup();
+        this.writeUniforms();
+      }
+
+      destroy() {
+        cancelAnimationFrame(this.raf);
+        if (this.waterTexture) this.waterTexture.destroy();
+        if (this.shineTexture) this.shineTexture.destroy();
+        if (this.fgTexture) this.fgTexture.destroy();
+        if (this.bgTexture) this.bgTexture.destroy();
+        if (this.uniformBuffer) this.uniformBuffer.destroy();
+      }
+
+      draw = () => {
+        if (!this.initialized) {
+          return;
+        }
+        // 参考仓库 RainEffect：每帧只同步会动态变化的液体图 waterTexture。
+        // 前景/背景纹理只在底图变化时更新，这样能减少不必要的 GPU 上传。
+        this.writeUniforms();
+        this.copySourceToTexture(this.waterTexture, this.canvasLiquid);
+        const encoder = this.device.createCommandEncoder();
+        const pass = encoder.beginRenderPass({
+          colorAttachments: [
+            {
+              view: this.context.getCurrentTexture().createView(),
+              clearValue: { r: 0, g: 0, b: 0, a: 1 },
+              loadOp: "clear",
+              storeOp: "store"
+            }
+          ]
+        });
+        pass.setPipeline(this.pipeline);
+        pass.setBindGroup(0, this.bindGroup);
+        pass.draw(6);
+        pass.end();
+        this.device.queue.submit([encoder.finish()]);
+        this.raf = requestAnimationFrame(this.draw);
+      };
+    }
+
+    function buildFallbackRainTexture() {
+      const canvas = createCanvas(520, 860);
+      const ctx = get2dContext(canvas);
+
+      for (let i = 0; i < 210; i += 1) {
+        const x = Math.random() * canvas.width;
+        const y = Math.random() * canvas.height;
+        const length = 40 + Math.random() * 170;
+        const width = 1 + Math.random() * 3.2;
+        const gradient = ctx.createLinearGradient(x, y, x + 10, y + length);
+        gradient.addColorStop(0, "rgba(255,255,255,0)");
+        gradient.addColorStop(0.2, "rgba(255,255,255,0.08)");
+        gradient.addColorStop(0.64, "rgba(210,240,255,0.28)");
+        gradient.addColorStop(1, "rgba(255,255,255,0)");
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(-0.16 + Math.random() * 0.05);
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, width, length);
+        ctx.restore();
+      }
+
+      for (let i = 0; i < 70; i += 1) {
+        const x = Math.random() * canvas.width;
+        const y = Math.random() * canvas.height;
+        const r = 4 + Math.random() * 16;
+        const body = ctx.createRadialGradient(x - r * 0.25, y - r * 0.25, 1, x, y, r);
+        body.addColorStop(0, "rgba(255,255,255,0.34)");
+        body.addColorStop(0.34, "rgba(184,224,255,0.14)");
+        body.addColorStop(1, "rgba(255,255,255,0)");
+        ctx.fillStyle = body;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      rainFallback.style.backgroundImage = `url(${canvas.toDataURL("image/png")})`;
+      runtime.fallbackTextureReady = true;
+    }
+
+    async function initRainRenderer() {
+      // 参考仓库 RainEffect：初始化顺序对齐当前本地 rain/src/main.ts
+      // 1) 创建低分辨率前景/背景纹理
+      // 2) 创建 Raindrops 液体模拟
+      // 3) 准备纹理源
+      // 4) 创建 WebGPU 渲染器
+      runtime.textureFgCtx = createTextureCanvas(textureFgSize).ctx;
+      runtime.textureFg = runtime.textureFgCtx.canvas;
+      runtime.textureBgCtx = createTextureCanvas(textureBgSize).ctx;
+      runtime.textureBg = runtime.textureBgCtx.canvas;
+
+      if (!runtime.dropAlphaSource || !runtime.dropColorSource) {
+        await prepareDropAssets();
+      }
+
+      const rainDpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+      runtime.raindrops = new Raindrops(
+        rainCanvas.width,
+        rainCanvas.height,
+        rainDpr,
+        runtime.dropAlphaSource,
+        runtime.dropColorSource,
+        {
+          trailRate: 1,
+          trailScaleRange: [0.25, 0.35],
+          collisionRadius: 0.45,
+          dropletsCleaningRadiusMultiplier: 0.28,
+          minR: 20,
+          maxR: 50,
+          rainChance: 0.35,
+          rainLimit: 6,
+          dropletsRate: 50,
+          dropletsSize: [3, 5.5],
+          raining: true,
+          collisionRadiusIncrease: 0.0002
+        }
+      );
+      runtime.raindrops.setIntensity(state.rainIntensity);
+
+      const usedLocalGeneratedTextures = await loadLocalGeneratedTextures();
+      if (!usedLocalGeneratedTextures) {
+        updateRainTexturesFromBase();
+      }
+      buildFallbackRainTexture();
+
+      try {
+        runtime.renderer = await RainRendererWebGPU.create(
+          rainCanvas,
+          runtime.raindrops.canvas,
+          runtime.textureFg,
+          runtime.textureBg,
+          null,
+          {
+            brightness: 1.04,
+            alphaMultiply: 6,
+            alphaSubtract: 3
+          }
+        );
+        runtime.webgpuEnabled = true;
+        rainFallback.classList.remove("is-visible");
+        announce("rain 折射雨滴已启用");
+      } catch (error) {
+        runtime.webgpuEnabled = false;
+        rainFallback.classList.add("is-visible");
+        announce("当前环境不支持 WebGPU，已切换轻量雨滴回退层");
+      }
+    }
+
+    function syncRainResize() {
+      if (runtime.raindrops) {
+        runtime.raindrops.resize(rainCanvas.width, rainCanvas.height, Math.max(1, Math.min(window.devicePixelRatio || 1, 2)));
+        runtime.raindrops.setIntensity(state.rainIntensity);
+      }
+      updateRainTexturesFromBase();
+      if (runtime.renderer) {
+        runtime.renderer.resize();
+      }
+    }
+
+    function resizeAll() {
+      state.dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+      fitCanvas(baseCanvas, baseCtx);
+      fitCanvas(fogCanvas, fogCtx);
+      fitCanvasSizeOnly(rainCanvas);
+      drawBaseImage();
+      updateRainTexturesFromBase();
+      rebuildFogCanvas();
+      syncRainResize();
+    }
+
+    function setPresetButton(name) {
+      presetButtons.forEach((button) => {
+        button.classList.toggle("is-active", button.dataset.preset === name);
+      });
+      assetImageBtn.classList.remove("is-active");
+    }
+
+    function useScene(name) {
+      state.currentScene = name;
+      state.currentSource = generateScene(name);
+      setPresetButton(name);
+      drawBaseImage();
+      updateRainTexturesFromBase();
+      clearArtwork(`已切换场景：${name === "night" ? "雨夜街灯" : name === "neon" ? "霓虹橱窗" : "暖灯书桌"}`);
+    }
+
+    function resetCurrentScene() {
+      drawBaseImage();
+      updateRainTexturesFromBase();
+      clearArtwork("当前底图已重置");
+    }
+
+    async function loadAssetImage() {
+      try {
+        state.currentSource = await loadImage("assets/images/default.jpg");
+        presetButtons.forEach((button) => button.classList.remove("is-active"));
+        assetImageBtn.classList.add("is-active");
+        drawBaseImage();
+        updateRainTexturesFromBase();
+        clearArtwork("已载入默认底图");
+      } catch (error) {
+        assetImageBtn.classList.remove("is-active");
+        announce("未找到默认底图，继续使用当前场景");
+      }
+    }
+
+    async function loadDefaultImageOrScene() {
+      try {
+        state.currentSource = await loadImage("assets/images/default.jpg");
+        presetButtons.forEach((button) => button.classList.remove("is-active"));
+        assetImageBtn.classList.add("is-active");
+      } catch (error) {
+        state.currentSource = generateScene(state.currentScene);
+        setPresetButton(state.currentScene);
+      }
+    }
+
+    function setRainIntensity(value) {
+      state.rainIntensity = Number(value) / 100;
+      rainAmountValue.textContent = `${value}%`;
+      if (runtime.raindrops) {
+        runtime.raindrops.setIntensity(state.rainIntensity);
+      }
+    }
+
+    // 这里保持 parallax 为 0，禁用“背景跟随鼠标移动”的效果，
+    // 让雨窗后的场景始终固定，只保留雨滴折射本身。
+    function animateParallax() {
+      state.pointerParallaxX = lerp(state.pointerParallaxX, 0, 0.08);
+      state.pointerParallaxY = lerp(state.pointerParallaxY, 0, 0.08);
+      if (runtime.renderer) {
+        runtime.renderer.parallaxX = state.pointerParallaxX;
+        runtime.renderer.parallaxY = state.pointerParallaxY;
+      }
+      runtime.parallaxRaf = requestAnimationFrame(animateParallax);
+    }
+
+    function createNoiseBuffer(context, durationSeconds) {
+      const length = Math.floor(context.sampleRate * durationSeconds);
+      const buffer = context.createBuffer(1, length, context.sampleRate);
+      const channel = buffer.getChannelData(0);
+      let last = 0;
+      for (let i = 0; i < length; i += 1) {
+        const white = Math.random() * 2 - 1;
+        last = (last + 0.02 * white) / 1.02;
+        channel[i] = last * 2.8;
+      }
+      return buffer;
+    }
+
+    function scheduleDroplet() {
+      if (!audioEngine.context || !audioEngine.masterGain || !audioEngine.isPlaying) {
+        return;
+      }
+      const ctx = audioEngine.context;
+      const now = ctx.currentTime;
+      const buffer = createNoiseBuffer(ctx, 0.12);
+      const source = ctx.createBufferSource();
+      const filter = ctx.createBiquadFilter();
+      const gain = ctx.createGain();
+      source.buffer = buffer;
+      filter.type = "bandpass";
+      filter.frequency.value = 800 + Math.random() * 1800;
+      filter.Q.value = 1.4;
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.04 + Math.random() * 0.05, now + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18 + Math.random() * 0.15);
+      source.connect(filter);
+      filter.connect(gain);
+      gain.connect(audioEngine.masterGain);
+      source.start(now);
+      source.stop(now + 0.35);
+      const nextDelay = 340 + Math.random() * 950;
+      audioEngine.dropletTimer = window.setTimeout(scheduleDroplet, nextDelay);
+    }
+
+    async function initAudioEngine() {
+      if (audioEngine.context) {
+        return;
+      }
+      const AudioContextRef = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextRef) {
+        throw new Error("AudioContext 不可用");
+      }
+      const ctx = new AudioContextRef();
+      const master = ctx.createGain();
+      master.gain.value = audioEngine.volume;
+      master.connect(ctx.destination);
+
+      const noiseBuffer = createNoiseBuffer(ctx, 2.5);
+      const source = ctx.createBufferSource();
+      source.buffer = noiseBuffer;
+      source.loop = true;
+
+      const lowpass = ctx.createBiquadFilter();
+      lowpass.type = "lowpass";
+      lowpass.frequency.value = 1700;
+      lowpass.Q.value = 0.15;
+
+      const highpass = ctx.createBiquadFilter();
+      highpass.type = "highpass";
+      highpass.frequency.value = 160;
+      highpass.Q.value = 0.6;
+
+      const rainGain = ctx.createGain();
+      rainGain.gain.value = 0.22;
+
+      const lfo = ctx.createOscillator();
+      const lfoGain = ctx.createGain();
+      lfo.type = "sine";
+      lfo.frequency.value = 0.08;
+      lfoGain.gain.value = 0.04;
+
+      source.connect(lowpass);
+      lowpass.connect(highpass);
+      highpass.connect(rainGain);
+      rainGain.connect(master);
+      lfo.connect(lfoGain);
+      lfoGain.connect(rainGain.gain);
+
+      source.start();
+      lfo.start();
+
+      audioEngine.context = ctx;
+      audioEngine.masterGain = master;
+      audioEngine.rainGain = rainGain;
+      audioEngine.rainSource = source;
+      audioEngine.lfo = lfo;
+      audioEngine.lfoGain = lfoGain;
+    }
+
+    function stopSynthRain() {
+      audioEngine.isPlaying = false;
+      if (audioEngine.dropletTimer) {
+        clearTimeout(audioEngine.dropletTimer);
+        audioEngine.dropletTimer = null;
+      }
+      if (audioEngine.context && audioEngine.context.state === "running") {
+        audioEngine.context.suspend();
+      }
+    }
+
+    function stopFileAudio() {
+      musicPlayer.pause();
+    }
+
+    function getCurrentTrack() {
+      return builtInTracks.find((track) => track.id === audioEngine.currentTrackId) || builtInTracks[0];
+    }
+
+    function updateAudioUi() {
+      const currentTrack = getCurrentTrack();
+      const isFileTrack = currentTrack.type === "file";
+      const isPlaying = isFileTrack ? !musicPlayer.paused : audioEngine.isPlaying;
+
+      audioToggle.textContent = isPlaying ? "暂停当前音频" : "播放当前音频";
+      audioToggle.classList.toggle("is-active", isPlaying);
+      audioState.textContent = isPlaying
+        ? `播放中：${currentTrack.title}`
+        : `已选择：${currentTrack.title}`;
+
+      Array.from(trackList.querySelectorAll(".track-btn")).forEach((button) => {
+        button.classList.toggle("is-active", button.dataset.trackId === currentTrack.id);
+      });
+    }
+
+    function selectTrack(trackId) {
+      const track = builtInTracks.find((item) => item.id === trackId);
+      if (!track) {
+        return;
+      }
+
+      const wasPlaying = getCurrentTrack().type === "file" ? !musicPlayer.paused : audioEngine.isPlaying;
+      stopFileAudio();
+      stopSynthRain();
+
+      audioEngine.currentTrackId = track.id;
+      if (track.type === "file") {
+        musicPlayer.src = track.src;
+        musicPlayer.load();
+      } else {
+        musicPlayer.removeAttribute("src");
+      }
+
+      updateAudioUi();
+      announce(`已切换音频：${track.title}`);
+
+      if (wasPlaying) {
+        toggleAudio();
+      }
+    }
+
+    function renderTrackList() {
+      trackList.innerHTML = builtInTracks.map((track) => `
+        <button class="btn track-btn${track.id === audioEngine.currentTrackId ? " is-active" : ""}" type="button" data-track-id="${track.id}">
+          <span>${track.title}<small>${track.subtitle}</small></span>
+        </button>
+      `).join("");
+
+      Array.from(trackList.querySelectorAll(".track-btn")).forEach((button) => {
+        button.addEventListener("click", () => {
+          selectTrack(button.dataset.trackId);
+        });
+      });
+    }
+
+    async function toggleAudio() {
+      const currentTrack = getCurrentTrack();
+      try {
+        if (currentTrack.type === "file") {
+          stopSynthRain();
+          if (musicPlayer.paused) {
+            await musicPlayer.play();
+            announce(`开始播放：${currentTrack.title}`);
+          } else {
+            stopFileAudio();
+            announce(`已暂停：${currentTrack.title}`);
+          }
+        } else {
+          stopFileAudio();
+          await initAudioEngine();
+          if (!audioEngine.context) {
+            return;
+          }
+          if (!audioEngine.isPlaying) {
+            await audioEngine.context.resume();
+            audioEngine.isPlaying = true;
+            scheduleDroplet();
+            announce("内置环境雨声已播放");
+          } else {
+            stopSynthRain();
+            announce("环境雨声已暂停");
+          }
+        }
+        updateAudioUi();
+      } catch (error) {
+        audioState.textContent = "当前浏览器不支持";
+        announce("当前环境无法启用内置音频");
+      }
+    }
+
+    ["touchstart", "touchmove", "touchend", "touchcancel"].forEach((type) => {
+      stage.addEventListener(type, (event) => {
+        event.preventDefault();
+      }, { passive: false });
+    });
+
+    fogCanvas.addEventListener("pointerdown", onPointerDown);
+    fogCanvas.addEventListener("pointermove", onPointerMove);
+    fogCanvas.addEventListener("pointerup", onPointerEnd);
+    fogCanvas.addEventListener("pointercancel", onPointerEnd);
+    fogCanvas.addEventListener("pointerleave", (event) => {
+      if (event.pointerType === "mouse" && event.pointerId === state.activePointerId) {
+        onPointerEnd(event);
+      }
+    });
+    fogCanvas.addEventListener("contextmenu", (event) => event.preventDefault());
+
+    clearBtn.addEventListener("click", () => clearArtwork("雾面已重新生成"));
+    resetSceneBtn.addEventListener("click", resetCurrentScene);
+    brushSizeInput.addEventListener("input", (event) => setBrushSize(event.target.value));
+    rainAmountInput.addEventListener("input", (event) => setRainIntensity(event.target.value));
+
+    presetButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        useScene(button.dataset.preset);
+      });
+    });
+
+    assetImageBtn.addEventListener("click", loadAssetImage);
+
+    imageUpload.addEventListener("change", (event) => {
+      const file = event.target.files && event.target.files[0];
+      if (!file) {
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const image = new Image();
+        image.onload = () => {
+          state.currentSource = image;
+          presetButtons.forEach((button) => button.classList.remove("is-active"));
+          assetImageBtn.classList.remove("is-active");
+          drawBaseImage();
+          updateRainTexturesFromBase();
+          clearArtwork(`已载入图片：${file.name}`);
+        };
+        image.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+      event.target.value = "";
+    });
+
+    volumeSlider.addEventListener("input", (event) => {
+      const value = Number(event.target.value);
+      audioEngine.volume = value / 100;
+      volumeValue.textContent = `${value}%`;
+      musicPlayer.volume = audioEngine.volume;
+      if (audioEngine.masterGain && audioEngine.context) {
+        audioEngine.masterGain.gain.setTargetAtTime(audioEngine.volume, audioEngine.context.currentTime, 0.05);
+      }
+    });
+
+    audioToggle.addEventListener("click", toggleAudio);
+    musicPlayer.addEventListener("ended", updateAudioUi);
+    musicPlayer.addEventListener("play", updateAudioUi);
+    musicPlayer.addEventListener("pause", updateAudioUi);
+
+    // 事件与 resize 节流逻辑参考本地 main.ts。
+    // 这里不再绑定鼠标视差，只保留尺寸重建，
+    // 让尺寸重建与 WebGPU 资源重配发生在同一帧，避免抖动和重复开销。
+    function setupEvents() {
+      window.addEventListener("resize", () => {
+        if (runtime.resizeQueued) {
+          return;
+        }
+        runtime.resizeQueued = true;
+        requestAnimationFrame(() => {
+          runtime.resizeQueued = false;
+          resizeAll();
+        });
+      });
+    }
+
+    window.addEventListener("orientationchange", () => {
+      window.setTimeout(resizeAll, 180);
+    });
+
+    async function init() {
+      runtime.textureFgCtx = get2dContext(runtime.textureFg);
+      runtime.textureBgCtx = get2dContext(runtime.textureBg);
+      setBrushSize(state.wipeSize);
+      setRainIntensity(rainAmountInput.value);
+      musicPlayer.volume = audioEngine.volume;
+      renderTrackList();
+      updateAudioUi();
+      await loadDefaultImageOrScene();
+      resizeAll();
+      await prepareDropAssets();
+      await initRainRenderer();
+      setupEvents();
+      animateParallax();
+      announce(runtime.webgpuEnabled ? "拖动开始擦雾，rain 已启用" : "拖动开始擦雾，当前使用轻量雨滴回退层");
+    }
+
+    init().catch((error) => {
+      rainFallback.classList.add("is-visible");
+      buildFallbackRainTexture();
+      announce("初始化遇到问题，已切换轻量雨滴回退层");
+      console.error(error);
+    });
+  </script>
+</body>
+</html>
