@@ -549,10 +549,11 @@
           <div class="row">
             <button id="clearBtn" class="btn warn" type="button">重新起雾</button>
             <button id="resetSceneBtn" class="btn" type="button">重置当前底图</button>
+            <button id="saveArtworkBtn" class="btn" type="button">保存作品</button>
           </div>
           <div class="slider-wrap">
             <span>擦除宽度 <strong id="brushValue">18</strong></span>
-            <input id="brushSize" type="range" min="8" max="52" step="1" value="18" aria-label="擦除宽度">
+            <input id="brushSize" type="range" min="1" max="52" step="1" value="18" aria-label="擦除宽度">
           </div>
           <p class="hint">绘画和选色已经移除，只保留羽化擦除。擦除使用 <code>destination-out</code> + <code>blur(5px)</code>，并限制单主指针，减少移动端误触和页面滚动冲突。</p>
         </div>
@@ -560,7 +561,8 @@
         <div class="panel panel-image">
           <h2 class="panel-title">底图与雨滴</h2>
           <div class="row">
-            <button class="btn is-active preset-btn" type="button" data-preset="night">雨夜街灯</button>
+            <button class="btn is-active preset-btn" type="button" data-preset="city">城市夜景</button>
+            <button class="btn preset-btn" type="button" data-preset="night">雨夜街灯</button>
             <button class="btn preset-btn" type="button" data-preset="neon">霓虹橱窗</button>
             <button class="btn preset-btn" type="button" data-preset="desk">暖灯书桌</button>
           </div>
@@ -606,6 +608,7 @@
 
     const clearBtn = document.getElementById("clearBtn");
     const resetSceneBtn = document.getElementById("resetSceneBtn");
+    const saveArtworkBtn = document.getElementById("saveArtworkBtn");
     const brushSizeInput = document.getElementById("brushSize");
     const brushValue = document.getElementById("brushValue");
     const wipeHud = document.getElementById("wipeHud");
@@ -634,7 +637,7 @@
       lastPoint: null,
       currentStroke: null,
       strokes: [],
-      currentScene: "night",
+      currentScene: "city",
       currentSource: null,
       pointerParallaxX: 0,
       pointerParallaxY: 0,
@@ -728,6 +731,7 @@
       raindrops: null,
       renderer: null,
       fallbackTextureReady: false,
+      fallbackTextureDataUrl: "",
       webgpuEnabled: false,
       parallaxRaf: 0,
       resizeQueued: false
@@ -1088,6 +1092,105 @@ fn fs(@builtin(position) fragCoord: vec4f) -> @location(0) vec4f {
       ctx.fillRect(0, 0, width, height);
     }
 
+    function paintCityScene(ctx, width, height) {
+      const sky = ctx.createLinearGradient(0, 0, 0, height);
+      sky.addColorStop(0, "#172445");
+      sky.addColorStop(0.38, "#10192f");
+      sky.addColorStop(0.78, "#080c17");
+      sky.addColorStop(1, "#03050a");
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, width, height);
+
+      const cityGlow = ctx.createRadialGradient(width * 0.55, height * 0.26, 0, width * 0.55, height * 0.26, width * 0.3);
+      cityGlow.addColorStop(0, "rgba(109, 188, 255, 0.22)");
+      cityGlow.addColorStop(0.42, "rgba(255, 92, 189, 0.12)");
+      cityGlow.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = cityGlow;
+      ctx.fillRect(0, 0, width, height);
+
+      const roadY = height * 0.8;
+      const ground = ctx.createLinearGradient(0, roadY, 0, height);
+      ground.addColorStop(0, "#0c111a");
+      ground.addColorStop(1, "#020409");
+      ctx.fillStyle = ground;
+      ctx.fillRect(0, roadY, width, height - roadY);
+
+      const buildingPalette = [
+        "rgba(11, 17, 28, 0.92)",
+        "rgba(14, 22, 36, 0.94)",
+        "rgba(18, 28, 44, 0.95)"
+      ];
+      const neonPalette = ["#61d7ff", "#ff74c5", "#ffd36b", "#97a8ff"];
+
+      for (let i = 0; i < 10; i += 1) {
+        const x = width * (0.03 + i * 0.095);
+        const w = width * (0.07 + (i % 3) * 0.018);
+        const h = height * (0.28 + (i % 5) * 0.08);
+        const y = roadY - h;
+        ctx.fillStyle = buildingPalette[i % buildingPalette.length];
+        ctx.fillRect(x, y, w, h);
+
+        const rows = Math.max(5, Math.floor(h / 58));
+        const cols = Math.max(2, Math.floor(w / 22));
+        for (let row = 0; row < rows; row += 1) {
+          for (let col = 0; col < cols; col += 1) {
+            if ((row + col + i) % 4 === 0) {
+              continue;
+            }
+            const warm = 0.18 + Math.random() * 0.24;
+            ctx.fillStyle = `rgba(255, 214, 145, ${warm})`;
+            ctx.fillRect(x + 7 + col * 18, y + 10 + row * 18, 7, 9);
+          }
+        }
+
+        if (i === 2 || i === 5 || i === 7) {
+          const signColor = neonPalette[i % neonPalette.length];
+          const sy = y + h * 0.26;
+          const glow = ctx.createLinearGradient(x, sy, x + w, sy);
+          glow.addColorStop(0, "rgba(255,255,255,0)");
+          glow.addColorStop(0.5, `${signColor}dd`);
+          glow.addColorStop(1, "rgba(255,255,255,0)");
+          ctx.fillStyle = glow;
+          ctx.fillRect(x + 6, sy, w - 12, 12);
+        }
+      }
+
+      const towerX = width * 0.58;
+      const towerY = height * 0.22;
+      const towerW = width * 0.14;
+      const towerH = height * 0.58;
+      ctx.fillStyle = "rgba(9, 15, 27, 0.96)";
+      roundRect(ctx, towerX, towerY, towerW, towerH, 20);
+      ctx.fill();
+
+      for (let row = 0; row < 16; row += 1) {
+        for (let col = 0; col < 4; col += 1) {
+          if ((row + col) % 3 === 0) {
+            continue;
+          }
+          ctx.fillStyle = `rgba(255, 229, 170, ${0.18 + Math.random() * 0.28})`;
+          ctx.fillRect(towerX + 18 + col * 30, towerY + 24 + row * 30, 12, 16);
+        }
+      }
+
+      const cyanGlow = ctx.createRadialGradient(towerX + towerW * 0.36, towerY + towerH * 0.12, 0, towerX + towerW * 0.36, towerY + towerH * 0.12, width * 0.14);
+      cyanGlow.addColorStop(0, "rgba(112, 226, 255, 0.28)");
+      cyanGlow.addColorStop(0.55, "rgba(112, 226, 255, 0.1)");
+      cyanGlow.addColorStop(1, "rgba(112, 226, 255, 0)");
+      ctx.fillStyle = cyanGlow;
+      ctx.fillRect(towerX - width * 0.08, towerY - width * 0.06, width * 0.28, width * 0.28);
+
+      const reflection = ctx.createLinearGradient(0, roadY, 0, height);
+      reflection.addColorStop(0, "rgba(88, 175, 255, 0.16)");
+      reflection.addColorStop(0.34, "rgba(255, 126, 203, 0.11)");
+      reflection.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = reflection;
+      ctx.fillRect(width * 0.14, roadY, width * 0.72, height - roadY);
+
+      ctx.fillStyle = "rgba(12, 18, 28, 0.84)";
+      ctx.fillRect(0, height * 0.86, width, height * 0.14);
+    }
+
     function paintNeonScene(ctx, width, height) {
       const bg = ctx.createLinearGradient(0, 0, 0, height);
       bg.addColorStop(0, "#26163e");
@@ -1234,7 +1337,9 @@ fn fs(@builtin(position) fragCoord: vec4f) -> @location(0) vec4f {
       canvas.height = 2400;
       const ctx = get2dContext(canvas);
 
-      if (name === "neon") {
+      if (name === "city") {
+        paintCityScene(ctx, canvas.width, canvas.height);
+      } else if (name === "neon") {
         paintNeonScene(ctx, canvas.width, canvas.height);
       } else if (name === "desk") {
         paintDeskScene(ctx, canvas.width, canvas.height);
@@ -1292,11 +1397,17 @@ fn fs(@builtin(position) fragCoord: vec4f) -> @location(0) vec4f {
     function drawEraseSegment(size, from, to) {
       fogCtx.save();
       fogCtx.globalCompositeOperation = "destination-out";
-      fogCtx.filter = "blur(5px)";
+      fogCtx.filter = "blur(4px)";
       fogCtx.strokeStyle = "rgba(0, 0, 0, 1)";
-      fogCtx.lineWidth = size * 1.18;
+      fogCtx.lineWidth = Math.max(1, size * 1.1);
       fogCtx.lineCap = "round";
       fogCtx.lineJoin = "round";
+      fogCtx.beginPath();
+      fogCtx.moveTo(from.x, from.y);
+      fogCtx.lineTo(to.x, to.y);
+      fogCtx.stroke();
+      fogCtx.filter = "blur(1.4px)";
+      fogCtx.lineWidth = Math.max(1, size * 0.62);
       fogCtx.beginPath();
       fogCtx.moveTo(from.x, from.y);
       fogCtx.lineTo(to.x, to.y);
@@ -1349,10 +1460,10 @@ fn fs(@builtin(position) fragCoord: vec4f) -> @location(0) vec4f {
       const height = fogCanvas.height / state.dpr;
       fogCtx.clearRect(0, 0, width, height);
       fogCtx.save();
-      fogCtx.filter = "blur(18px) brightness(0.74) saturate(0.94)";
+      fogCtx.filter = "blur(20px) brightness(0.66) saturate(0.9)";
       fogCtx.drawImage(baseCanvas, 0, 0, width, height);
       fogCtx.restore();
-      fogCtx.fillStyle = "rgba(17, 28, 47, 0.3)";
+      fogCtx.fillStyle = "rgba(18, 30, 49, 0.4)";
       fogCtx.fillRect(0, 0, width, height);
       sprinkleMist(width, height);
       replayStrokes();
@@ -1365,9 +1476,80 @@ fn fs(@builtin(position) fragCoord: vec4f) -> @location(0) vec4f {
     }
 
     function setBrushSize(value) {
-      state.wipeSize = Number(value);
-      brushValue.textContent = value;
-      wipeHud.textContent = `${value} px`;
+      const nextValue = Math.max(1, Number(value));
+      state.wipeSize = nextValue;
+      brushValue.textContent = String(nextValue);
+      wipeHud.textContent = `${nextValue} px`;
+    }
+
+    function resetPointerInteractionState() {
+      if (state.activePointerId !== null && typeof fogCanvas.hasPointerCapture === "function") {
+        try {
+          if (fogCanvas.hasPointerCapture(state.activePointerId)) {
+            fogCanvas.releasePointerCapture(state.activePointerId);
+          }
+        } catch (error) {
+          console.warn("releasePointerCapture failed", error);
+        }
+      }
+      state.activePointerId = null;
+      state.isWiping = false;
+      state.lastPoint = null;
+      state.currentStroke = null;
+    }
+
+    function getSceneLabel(name) {
+      if (name === "city") return "城市夜景";
+      if (name === "night") return "雨夜街灯";
+      if (name === "neon") return "霓虹橱窗";
+      if (name === "desk") return "暖灯书桌";
+      return "当前底图";
+    }
+
+    function drawFallbackRainToContext(ctx, width, height) {
+      if (!runtime.fallbackTextureDataUrl) {
+        return Promise.resolve();
+      }
+      return new Promise((resolve) => {
+        const image = new Image();
+        image.onload = () => {
+          const pattern = ctx.createPattern(image, "repeat");
+          if (pattern) {
+            ctx.save();
+            ctx.globalAlpha = 0.88;
+            ctx.fillStyle = pattern;
+            ctx.fillRect(0, 0, width, height);
+            ctx.restore();
+          }
+          resolve();
+        };
+        image.onerror = () => resolve();
+        image.src = runtime.fallbackTextureDataUrl;
+      });
+    }
+
+    async function saveArtwork() {
+      resetPointerInteractionState();
+      const exportCanvas = createCanvas(baseCanvas.width, baseCanvas.height);
+      const exportCtx = get2dContext(exportCanvas);
+      exportCtx.drawImage(baseCanvas, 0, 0);
+
+      if (runtime.webgpuEnabled) {
+        try {
+          exportCtx.drawImage(rainCanvas, 0, 0);
+        } catch (error) {
+          console.warn("rainCanvas export failed", error);
+        }
+      } else if (rainFallback.classList.contains("is-visible")) {
+        await drawFallbackRainToContext(exportCtx, exportCanvas.width, exportCanvas.height);
+      }
+
+      exportCtx.drawImage(fogCanvas, 0, 0);
+      const link = document.createElement("a");
+      link.href = exportCanvas.toDataURL("image/png");
+      link.download = `rain-window-${Date.now()}.png`;
+      link.click();
+      announce("当前作品已保存为 PNG");
     }
 
     function getPointFromEvent(event) {
@@ -1422,7 +1604,13 @@ fn fs(@builtin(position) fragCoord: vec4f) -> @location(0) vec4f {
       state.activePointerId = event.pointerId;
       state.pointerStartX = point.x;
       state.pointerStartY = point.y;
-      fogCanvas.setPointerCapture(event.pointerId);
+      if (typeof fogCanvas.setPointerCapture === "function") {
+        try {
+          fogCanvas.setPointerCapture(event.pointerId);
+        } catch (error) {
+          console.warn("setPointerCapture failed", error);
+        }
+      }
       startWipe(point);
     }
 
@@ -1448,6 +1636,15 @@ fn fs(@builtin(position) fragCoord: vec4f) -> @location(0) vec4f {
       }
       event.preventDefault();
       finishWipe();
+      if (typeof fogCanvas.hasPointerCapture === "function") {
+        try {
+          if (fogCanvas.hasPointerCapture(event.pointerId)) {
+            fogCanvas.releasePointerCapture(event.pointerId);
+          }
+        } catch (error) {
+          console.warn("releasePointerCapture failed", error);
+        }
+      }
       state.activePointerId = null;
     }
 
@@ -2235,7 +2432,8 @@ fn fs(@builtin(position) fragCoord: vec4f) -> @location(0) vec4f {
         ctx.fill();
       }
 
-      rainFallback.style.backgroundImage = `url(${canvas.toDataURL("image/png")})`;
+      runtime.fallbackTextureDataUrl = canvas.toDataURL("image/png");
+      rainFallback.style.backgroundImage = `url(${runtime.fallbackTextureDataUrl})`;
       runtime.fallbackTextureReady = true;
     }
 
@@ -2337,15 +2535,17 @@ fn fs(@builtin(position) fragCoord: vec4f) -> @location(0) vec4f {
     }
 
     function useScene(name) {
+      resetPointerInteractionState();
       state.currentScene = name;
       state.currentSource = generateScene(name);
       setPresetButton(name);
       drawBaseImage();
       updateRainTexturesFromBase();
-      clearArtwork(`已切换场景：${name === "night" ? "雨夜街灯" : name === "neon" ? "霓虹橱窗" : "暖灯书桌"}`);
+      clearArtwork(`已切换场景：${getSceneLabel(name)}`);
     }
 
     function resetCurrentScene() {
+      resetPointerInteractionState();
       drawBaseImage();
       updateRainTexturesFromBase();
       clearArtwork("当前底图已重置");
@@ -2353,6 +2553,7 @@ fn fs(@builtin(position) fragCoord: vec4f) -> @location(0) vec4f {
 
     async function loadAssetImage() {
       try {
+        resetPointerInteractionState();
         state.currentSource = await loadImage("assets/images/default.jpg");
         presetButtons.forEach((button) => button.classList.remove("is-active"));
         assetImageBtn.classList.add("is-active");
@@ -2610,6 +2811,9 @@ fn fs(@builtin(position) fragCoord: vec4f) -> @location(0) vec4f {
     fogCanvas.addEventListener("pointermove", onPointerMove);
     fogCanvas.addEventListener("pointerup", onPointerEnd);
     fogCanvas.addEventListener("pointercancel", onPointerEnd);
+    fogCanvas.addEventListener("lostpointercapture", () => {
+      resetPointerInteractionState();
+    });
     fogCanvas.addEventListener("pointerleave", (event) => {
       if (event.pointerType === "mouse" && event.pointerId === state.activePointerId) {
         onPointerEnd(event);
@@ -2619,6 +2823,12 @@ fn fs(@builtin(position) fragCoord: vec4f) -> @location(0) vec4f {
 
     clearBtn.addEventListener("click", () => clearArtwork("雾面已重新生成"));
     resetSceneBtn.addEventListener("click", resetCurrentScene);
+    saveArtworkBtn.addEventListener("click", () => {
+      saveArtwork().catch((error) => {
+        console.error(error);
+        announce("保存作品失败，请稍后重试");
+      });
+    });
     brushSizeInput.addEventListener("input", (event) => setBrushSize(event.target.value));
     rainAmountInput.addEventListener("input", (event) => setRainIntensity(event.target.value));
 
@@ -2635,6 +2845,7 @@ fn fs(@builtin(position) fragCoord: vec4f) -> @location(0) vec4f {
       if (!file) {
         return;
       }
+      resetPointerInteractionState();
       const reader = new FileReader();
       reader.onload = () => {
         const image = new Image();
@@ -2642,8 +2853,7 @@ fn fs(@builtin(position) fragCoord: vec4f) -> @location(0) vec4f {
           state.currentSource = image;
           presetButtons.forEach((button) => button.classList.remove("is-active"));
           assetImageBtn.classList.remove("is-active");
-          drawBaseImage();
-          updateRainTexturesFromBase();
+          resizeAll();
           clearArtwork(`已载入图片：${file.name}`);
         };
         image.src = reader.result;
