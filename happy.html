@@ -1847,6 +1847,19 @@ fn fs(@builtin(position) fragCoord: vec4f) -> @location(0) vec4f {
       announce(message);
     }
 
+    function rebuildStageAfterSourceChange(message) {
+      cancelActiveWipe();
+      state.strokes = [];
+      fogCanvas.style.pointerEvents = "none";
+      requestAnimationFrame(() => {
+        resizeAll();
+        requestAnimationFrame(() => {
+          fogCanvas.style.pointerEvents = "";
+          announce(message);
+        });
+      });
+    }
+
     function setBrushSize(value) {
       const safeValue = Math.max(1, Number(value));
       state.wipeSize = safeValue;
@@ -3010,31 +3023,22 @@ fn fs(@builtin(position) fragCoord: vec4f) -> @location(0) vec4f {
     }
 
     function useScene(name) {
-      cancelActiveWipe();
       state.currentScene = name;
       state.currentSource = generateScene(name);
       setPresetButton(name);
-      drawBaseImage();
-      updateRainTexturesFromBase();
-      clearArtwork(`已切换场景：${getSceneLabel(name)}`);
+      rebuildStageAfterSourceChange(`已切换场景：${getSceneLabel(name)}`);
     }
 
     function resetCurrentScene() {
-      cancelActiveWipe();
-      drawBaseImage();
-      updateRainTexturesFromBase();
-      clearArtwork("当前底图已重置");
+      rebuildStageAfterSourceChange("当前底图已重置");
     }
 
     async function loadAssetImage() {
       try {
-        cancelActiveWipe();
         state.currentSource = await loadImage("assets/images/default.jpg");
         presetButtons.forEach((button) => button.classList.remove("is-active"));
         assetImageBtn.classList.add("is-active");
-        drawBaseImage();
-        updateRainTexturesFromBase();
-        clearArtwork("已载入默认底图");
+        rebuildStageAfterSourceChange("已载入默认底图");
       } catch (error) {
         assetImageBtn.classList.remove("is-active");
         announce("未找到默认底图，继续使用当前场景");
@@ -3323,6 +3327,9 @@ fn fs(@builtin(position) fragCoord: vec4f) -> @location(0) vec4f {
         return;
       }
       cancelActiveWipe();
+      if (typeof event.target.blur === "function") {
+        event.target.blur();
+      }
       const reader = new FileReader();
       reader.onload = () => {
         const image = new Image();
@@ -3330,9 +3337,7 @@ fn fs(@builtin(position) fragCoord: vec4f) -> @location(0) vec4f {
           state.currentSource = image;
           presetButtons.forEach((button) => button.classList.remove("is-active"));
           assetImageBtn.classList.remove("is-active");
-          drawBaseImage();
-          updateRainTexturesFromBase();
-          clearArtwork(`已载入图片：${file.name}`);
+          rebuildStageAfterSourceChange(`已载入图片：${file.name}`);
         };
         image.src = reader.result;
       };
